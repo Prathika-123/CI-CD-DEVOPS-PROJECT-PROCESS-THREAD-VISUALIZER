@@ -1,17 +1,26 @@
 package processThreadVisualizer.PTV.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.socket.config.annotation.EnableWebSocket;
-import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
-import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
-import processThreadVisualizer.PTV.websocket.ThreadWebSocketHandler;
+import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.web.socket.config.annotation.*;
 
 @Configuration
-@EnableWebSocket
-public class WebSocketConfig implements WebSocketConfigurer {
+@EnableWebSocketMessageBroker
+public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
-    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry){
-        registry.addHandler(new ThreadWebSocketHandler(),"/ws/threads").setAllowedOrigins("*");
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        // /topic prefix — browser subscribes to these to RECEIVE data
+        config.enableSimpleBroker("/topic");
+        // /app prefix — browser sends messages TO server using this
+        config.setApplicationDestinationPrefixes("/app");
+    }
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // /ws is the WebSocket handshake endpoint
+        // withSockJS() adds SockJS fallback for older browsers
+        registry.addEndpoint("/ws").setAllowedOriginPatterns("*").withSockJS();
     }
 }
+

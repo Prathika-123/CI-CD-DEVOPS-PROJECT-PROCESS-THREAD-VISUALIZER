@@ -2,185 +2,314 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Thread Visualizer</title>
-
-    <style>
-        body {
-            margin:0;
-            display:flex;
-            height:100vh;
-            font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #1e1e2f, #2a2a40);
-            color:white;
-        }
-
-        /* LEFT PANEL */
-        #circle-container {
-            width:600px;
-            height:600px;
-            margin:auto;
-            position:relative;
-            border-radius:50%;
-            backdrop-filter: blur(15px);
-            background: rgba(255,255,255,0.05);
-            box-shadow: 0 0 40px rgba(0,0,0,0.5);
-        }
-
-        /* THREAD NODE */
-        .thread-node {
-            position:absolute;
-            width:55px;
-            height:55px;
-            border-radius:50%;
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            font-weight:bold;
-            font-size:13px;
-            cursor:pointer;
-            transition: all 0.3s ease;
-            box-shadow:0 0 15px rgba(0,0,0,0.5);
-        }
-
-        .thread-node:hover {
-            transform: scale(1.2);
-            box-shadow:0 0 25px rgba(255,255,255,0.6);
-        }
-
-        /* RIGHT PANEL */
-        #sidebar {
-            width:420px;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(20px);
-            padding:20px;
-            overflow-y:auto;
-            border-left:1px solid rgba(255,255,255,0.1);
-        }
-
-        /* HEADER */
-        #sidebar h2 {
-            margin-top:0;
-            font-size:22px;
-            letter-spacing:1px;
-            border-bottom:2px solid #4CAF50;
-            padding-bottom:8px;
-        }
-
-        /* THREAD CARD */
-        .thread-info {
-            background: rgba(255,255,255,0.05);
-            border-radius:10px;
-            padding:12px;
-            margin-bottom:12px;
-            transition:0.3s;
-        }
-
-        .thread-info:hover {
-            background: rgba(255,255,255,0.1);
-            transform: scale(1.02);
-        }
-
-        /* TEXT */
-        .thread-info p {
-            margin:4px 0;
-            font-size:13px;
-        }
-
-        .timestamp {
-            color:#bbb;
-            font-size:12px;
-            margin-top:6px;
-            max-height:80px;
-            overflow-y:auto;
-        }
-
-        /* SCROLLBAR */
-        #sidebar::-webkit-scrollbar {
-            width:6px;
-        }
-        #sidebar::-webkit-scrollbar-thumb {
-            background:#555;
-            border-radius:10px;
-        }
-    </style>
+    <title>Java Thread Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
 </head>
-
 <body>
 
-<div id="circle-container"></div>
+<div id="top-bar">
+    <div id="title-area">
+        <span id="logo">&#11041;</span>
+        <span id="app-title">Java Thread Visualizer</span>
+    </div>
+    <div id="status-bar">
+        <div id="status-dot"></div>
+        <span id="status-text">Connecting...</span>
+        <button id="reconnect-btn" onclick="reconnect()">Reconnect JVM</button>
+    </div>
+    <button onclick="suspendJVM()"
+            style="font-size:11px;padding:4px 10px;background:transparent;
+                   color:#EF9F27;border:1px solid #EF9F27;border-radius:4px;
+                   cursor:pointer;white-space:nowrap">
+        ⏸ Pause JVM
+    </button>
+    <button onclick="resumeJVM()"
+            style="font-size:11px;padding:4px 10px;background:transparent;
+                   color:#1D9E75;border:1px solid #1D9E75;border-radius:4px;
+                   cursor:pointer;white-space:nowrap">
+        ▶ Resume JVM
+    </button>
+    <div id="stats-bar">
+        <span class="stat"><span id="total-count">0</span> threads</span>
+        <span class="stat run-stat"><span id="run-count">0</span> running</span>
+        <span class="stat block-stat"><span id="block-count">0</span> blocked</span>
+        <span class="stat wait-stat"><span id="wait-count">0</span> waiting</span>
+    </div>
+</div>
 
-<div id="sidebar">
-    <h2>⚡ Thread Monitor</h2>
-    <div id="details-container"></div>
+<div id="main-layout">
+
+    <div id="canvas-area">
+        <div id="canvas-label">JVM Process</div>
+        <div id="process-circle">
+            <div id="process-label">JVM<br>Process</div>
+            <div id="thread-nodes"></div>
+        </div>
+        <div id="legend">
+            <span class="legend-item"><span class="ldot RUNNABLE"></span>Runnable</span>
+            <span class="legend-item"><span class="ldot BLOCKED"></span>Blocked</span>
+            <span class="legend-item"><span class="ldot TIMED_WAITING"></span>Timed waiting</span>
+            <span class="legend-item"><span class="ldot WAITING"></span>Waiting</span>
+            <span class="legend-item"><span class="ldot TERMINATED"></span>Terminated</span>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <div id="detail-card">
+            <div id="detail-header">Click a thread node to inspect</div>
+            <div id="detail-body"></div>
+        </div>
+        <div id="thread-panel">
+            <div class="panel-title">All Threads</div>
+            <div id="thread-list"></div>
+        </div>
+        <div id="history-panel">
+            <div class="panel-title">
+                Execution History
+                <button onclick="clearHistory()"
+                        style="float:right;font-size:10px;padding:2px 8px;cursor:pointer">
+                    Clear
+                </button>
+            </div>
+            <div id="history-list"></div>
+        </div>
+    </div>
+
 </div>
 
 <script>
-    const circle = document.getElementById('circle-container');
-    const detailsContainer = document.getElementById('details-container');
 
-    function getColor(state){
-        switch(state){
-            case "RUNNABLE": return "linear-gradient(135deg,#00c853,#69f0ae)";
-            case "BLOCKED": return "linear-gradient(135deg,#d50000,#ff5252)";
-            case "WAITING":
-            case "TIMED_WAITING": return "linear-gradient(135deg,#ffab00,#ffd740)";
-            case "TERMINATED": return "linear-gradient(135deg,#616161,#9e9e9e)";
-            default: return "linear-gradient(135deg,#2962ff,#82b1ff)";
+    // ── Fallback: poll REST API every second if WebSocket fails ───
+    function pollREST() {
+        setInterval(() => {
+            fetch('/api/threads')
+                .then(r => r.json())
+                .then(threads => renderAll(threads))
+                .catch(e => console.error('Poll error:', e));
+        }, 1000);
+        document.getElementById('status-dot').className = 'connected';
+        document.getElementById('status-text').textContent = 'Connected (polling)';
+    }
+
+    // ── WebSocket connection ───────────────────────────────────────
+    function connect() {
+        try {
+            const socket = new SockJS('/ws');
+            const stomp = Stomp.over(socket);
+            stomp.debug = null;
+
+            stomp.connect({}, () => {
+                setStatus(true);
+                stomp.subscribe('/topic/threads', msg => {
+                    renderAll(JSON.parse(msg.body));
+                });
+            }, err => {
+                console.warn('STOMP failed, falling back to REST polling');
+                pollREST();
+            });
+        } catch(e) {
+            console.warn('WebSocket unavailable, using REST polling');
+            pollREST();
         }
     }
 
-    const ws = new WebSocket("ws://localhost:8080/ws/threads");
+    function reconnect() {
+        fetch('/api/connect', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => { alert(d.message); connect(); });
+    }
 
-    ws.onmessage = function(event){
-        const threads = JSON.parse(event.data);
+    function setStatus(ok) {
+        document.getElementById('status-dot').className = ok ? 'connected' : 'disconnected';
+        document.getElementById('status-text').textContent = ok ? 'Connected to JVM' : 'Disconnected';
+    }
 
-        // DRAW CIRCLE
-        circle.innerHTML = '';
-        const radius = 250, centerX = 300, centerY = 300;
+    // ── State ─────────────────────────────────────────────────────
+    let selectedThreadId = null;
+    let historyLog = [];
+    let previousStates = {};
 
-        threads.forEach((thread, index)=>{
-            const angle = (2*Math.PI/threads.length)*index;
-            const x = centerX + radius*Math.cos(angle) - 27;
-            const y = centerY + radius*Math.sin(angle) - 27;
+    // ── Main render — called every second ─────────────────────────
+    function renderAll(threads) {
+        updateStats(threads);
+        renderProcessCircle(threads);
+        renderThreadList(threads);
+        detectStateChanges(threads);
+        if (selectedThreadId !== null) {
+            const sel = threads.find(t => t.id === selectedThreadId);
+            if (sel) renderDetailCard(sel);
+        }
+    }
 
-            const node = document.createElement('div');
-            node.className = 'thread-node';
-            node.style.left = `${x}px`;
-            node.style.top = `${y}px`;
-            node.style.background = getColor(thread.state);
-            node.innerText = thread.id;
+    // ── Stats bar ─────────────────────────────────────────────────
+    function updateStats(threads) {
+        document.getElementById('total-count').textContent = threads.length;
+        document.getElementById('run-count').textContent =
+            threads.filter(t => t.state === 'RUNNABLE').length;
+        document.getElementById('block-count').textContent =
+            threads.filter(t => t.state === 'BLOCKED').length;
+        document.getElementById('wait-count').textContent =
+            threads.filter(t => t.state === 'WAITING' || t.state === 'TIMED_WAITING').length;
+    }
 
-            circle.appendChild(node);
+    // ── Process circle ────────────────────────────────────────────
+    function renderProcessCircle(threads) {
+    const container = document.getElementById('thread-nodes');
+    container.innerHTML = '';
+    if (!threads.length) return;
+
+    // Read actual rendered size — no more hardcoding!
+    const circle = document.getElementById('process-circle');
+    const circleSize = circle.offsetWidth;   // actual rendered px
+    const center = circleSize / 2;
+    const nodeSize = 52;
+    const nodeRadius = nodeSize / 2;
+    const orbitRadius = center - nodeRadius - 20;
+
+    threads.forEach((thread, index) => {
+        const angle = (2 * Math.PI * index / threads.length) - (Math.PI / 2);
+        const x = center + orbitRadius * Math.cos(angle) - nodeRadius;
+        const y = center + orbitRadius * Math.sin(angle) - nodeRadius;
+
+        const node = document.createElement('div');
+        node.className = 'thread-node ' + thread.state;
+        node.id = 'node-' + thread.id;
+        if (thread.id === selectedThreadId) node.classList.add('selected');
+        node.style.left = x + 'px';
+        node.style.top  = y + 'px';
+        node.textContent = thread.name.length > 7
+            ? thread.name.substring(0, 6) + '..'
+            : thread.name;
+        node.title = thread.name + '\nState: ' + thread.state + '\nMethod: ' + thread.currentMethod;
+
+        node.addEventListener('click', () => {
+            selectedThreadId = thread.id;
+            renderDetailCard(thread);
+            document.querySelectorAll('.thread-node').forEach(n => n.classList.remove('selected'));
+            document.querySelectorAll('.thread-row').forEach(r => r.classList.remove('selected'));
+            node.classList.add('selected');
+            const row = document.getElementById('row-' + thread.id);
+            if (row) row.classList.add('selected');
         });
 
-        // SIDEBAR
-        detailsContainer.innerHTML = '';
+        container.appendChild(node);
+    });
+}
+
+    // ── Sidebar thread list ───────────────────────────────────────
+    function renderThreadList(threads) {
+        const list = document.getElementById('thread-list');
+        list.innerHTML = '';
 
         threads.forEach(thread => {
+            const row = document.createElement('div');
+            row.className = 'thread-row' + (thread.id === selectedThreadId ? ' selected' : '');
+            row.id = 'row-' + thread.id;
+            row.innerHTML = `
+                <span class="badge ${thread.state}">${thread.state.replace('_', ' ')}</span>
+                <span class="tname">${thread.name}</span>
+                <span class="tmethod">${thread.currentMethod}</span>`;
 
-            const threadDiv = document.createElement('div');
-            threadDiv.className = 'thread-info';
+            row.addEventListener('click', () => {
+                selectedThreadId = thread.id;
+                renderDetailCard(thread);
+                document.querySelectorAll('.thread-row').forEach(r => r.classList.remove('selected'));
+                document.querySelectorAll('.thread-node').forEach(n => n.classList.remove('selected'));
+                row.classList.add('selected');
+                const node = document.getElementById('node-' + thread.id);
+                if (node) node.classList.add('selected');
+            });
 
-            const historyHtml = thread.history
-                .map(h => `${h.state} @ ${new Date(parseInt(h.time)).toLocaleTimeString()}`)
-                .join("<br>");
-
-            threadDiv.innerHTML = `
-                <p><strong>ID:</strong> ${thread.id}</p>
-                <p><strong>Name:</strong> ${thread.name}</p>
-                <p><strong>State:</strong> ${thread.state}</p>
-                <p><strong>Class:</strong> ${thread.class}</p>
-                <p><strong>Method:</strong> ${thread.method}</p>
-                <p><strong>Line:</strong> ${thread.line}</p>
-                <div class="timestamp">
-                    <strong>History:</strong><br>${historyHtml}
-                </div>
-            `;
-
-            detailsContainer.appendChild(threadDiv);
+            list.appendChild(row);
         });
-    };
-</script>
+    }
 
+    // ── Detail card ───────────────────────────────────────────────
+    function renderDetailCard(t) {
+        document.getElementById('detail-header').textContent = 'Thread details';
+        document.getElementById('detail-body').innerHTML = `
+            <div class="detail-name">
+                ${t.name}
+                <span class="badge ${t.state}" style="margin-left:6px">${t.state.replace('_', ' ')}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Thread ID</span>
+                <span class="value">${t.id}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Group</span>
+                <span class="value">${t.threadGroup}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Method</span>
+                <span class="value" title="${t.currentMethod}">${t.currentMethod}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Source file</span>
+                <span class="value">${t.sourceFile}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Line number</span>
+                <span class="value">${t.lineNumber > 0 ? t.lineNumber : '-'}</span>
+            </div>`;
+    }
+
+    // ── History log ───────────────────────────────────────────────
+    function detectStateChanges(threads) {
+        const now = new Date().toLocaleTimeString();
+        threads.forEach(t => {
+            if (previousStates[t.id] === undefined) {
+                // First time seeing this thread — log initial state
+                historyLog.unshift({ time: now, name: t.name, state: t.state });
+            } else if (previousStates[t.id] !== t.state) {
+                // State changed — log it
+                historyLog.unshift({ time: now, name: t.name, state: t.state });
+            }
+            previousStates[t.id] = t.state;
+            if (historyLog.length > 100) historyLog.pop();
+        });
+        renderHistory();
+    }
+
+    function renderHistory() {
+        document.getElementById('history-list').innerHTML = historyLog.slice(0, 50).map(e => `
+            <div class="history-entry">
+                <span class="h-time">${e.time}</span>
+                <span class="h-name">${e.name}</span>
+                <span>→</span>
+                <span class="h-state ${e.state}">${e.state.replace('_', ' ')}</span>
+            </div>`).join('');
+    }
+
+    function clearHistory() {
+        historyLog = [];
+        previousStates = {};
+        renderHistory();
+    }
+
+    function suspendJVM() {
+    fetch('/api/suspend', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('status-text').textContent = '⏸ JVM Paused';
+            document.getElementById('status-dot').style.background = '#EF9F27';
+        });
+}
+
+function resumeJVM() {
+    fetch('/api/resume', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('status-text').textContent = 'Connected to JVM';
+            document.getElementById('status-dot').style.background = '#1D9E75';
+        });
+}
+
+    // ── Start ─────────────────────────────────────────────────────
+    connect();
+
+</script>
 </body>
 </html>
