@@ -205,3 +205,41 @@ body {
 .h-state.WAITING       { color: #8B5CF6; }
 .h-state.TIMED_WAITING { color: #378ADD; }
 .h-state.TERMINATED    { color: #888; }
+
+/* ── Richer history entries ── */
+.history-entry {
+    padding: 6px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 10px;
+}
+.h-main-row {
+    display: flex; align-items: center;
+    gap: 6px; flex-wrap: wrap;
+}
+.h-method-row {
+    display: flex; gap: 4px; align-items: center;
+    margin-top: 2px; padding-left: 4px;
+    font-family: monospace; font-size: 9px;
+}
+.h-method-label { color: #ccc; }
+.h-method { color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.h-file { color: #aaa; font-style: italic; }
+.h-line {
+    font-size: 9px; background: #f0f4ff;
+    color: #378ADD; padding: 1px 5px;
+    border-radius: 4px; font-family: monospace;
+}
+.h-vars-row {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    margin-top: 3px; padding-left: 4px;
+}
+.h-var {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: #f8f8f0; border: 0.5px solid #e0e0c0;
+    border-radius: 4px; padding: 1px 6px; font-family: monospace;
+    font-size: 9px;
+}
+.h-var-name { color: #856404; font-weight: 600; }
+.h-var-eq { color: #999; }
+.h-var-val { color: #1D9E75; font-weight: 700; }
+.h-var-type { color: #bbb; font-style: italic; }

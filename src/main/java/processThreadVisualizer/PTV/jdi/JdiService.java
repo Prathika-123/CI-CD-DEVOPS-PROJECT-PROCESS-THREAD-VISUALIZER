@@ -5,6 +5,8 @@ import com.sun.jdi.connect.AttachingConnector;
 import com.sun.jdi.connect.Connector;
 import org.springframework.stereotype.Service;
 import processThreadVisualizer.PTV.model.ThreadInfo;
+import com.sun.jdi.LocalVariable;
+import com.sun.jdi.Value;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -84,6 +86,8 @@ public class JdiService {
         String sourceFile = "-";
         int lineNumber = -1;
         String groupName = "-";
+        List<Map<String, String>> variables = new ArrayList<>();
+
 
         // Fix group name
         try {
@@ -94,38 +98,61 @@ public class JdiService {
             groupName = "unknown";
         }
 
-        // Read stack frames
+        // Read stack frames + variables
         try {
             t.suspend();
             try {
                 List<StackFrame> frames = t.frames();
-                // Find first frame that has line number info
-                // (skip native methods like sleepNanos)
+
                 for (StackFrame frame : frames) {
                     Location loc = frame.location();
+                    String className = loc.declaringType().name();
+
+                    // Skip JDK internal classes — look for YOUR code
+                    if (className.startsWith("java.") ||
+                            className.startsWith("javax.") ||
+                            className.startsWith("sun.") ||
+                            className.startsWith("jdk.") ||
+                            className.startsWith("com.sun.")) {
+                        // Still set method if nothing found yet
+                        if (method.equals("unknown")) {
+                            method = className + "." + loc.method().name() + "()";
+                        }
+                        continue; // skip to next frame
+                    }
+
+                    // This is YOUR code — use this frame
                     int line = loc.lineNumber();
                     String file = "-";
                     try { file = loc.sourceName(); }
                     catch (AbsentInformationException e) {
-                        file = loc.declaringType().name() + ".java";
+                        file = className + ".java";
                     }
-                    // Use this frame if it has a real line number
-                    if (line > 0) {
-                        method = loc.declaringType().name()
-                                + "." + loc.method().name() + "()";
-                        sourceFile = file;
-                        lineNumber = line;
-                        break;
+
+                    method = className + "." + loc.method().name() + "()";
+                    sourceFile = file;
+                    lineNumber = line;
+
+                    // Read local variables from YOUR frame
+                    try {
+                        List<LocalVariable> localVars = frame.visibleVariables();
+                        for (LocalVariable lv : localVars) {
+                            try {
+                                Value val = frame.getValue(lv);
+                                Map<String, String> varMap = new HashMap<>();
+                                varMap.put("name", lv.name());
+                                varMap.put("type", lv.typeName());
+                                varMap.put("value", val != null ? val.toString() : "null");
+                                variables.add(varMap);
+                            } catch (Exception ignored) {}
+                        }
+                    } catch (AbsentInformationException e) {
+                        // No debug info for this frame
                     }
-                    // If no frame has line number, use top frame anyway
-                    if (method.equals("unknown")) {
-                        method = loc.declaringType().name()
-                                + "." + loc.method().name() + "()";
-                        sourceFile = file;
-                    }
+                    break; // Found your code — stop
                 }
             } finally {
-                t.resume(); // Always resume even if error
+                t.resume();
             }
         } catch (IncompatibleThreadStateException e) {
             method = "(running)";
@@ -140,7 +167,8 @@ public class JdiService {
                 method,
                 sourceFile,
                 lineNumber,
-                groupName
+                groupName,
+                variables   // ← pass variables
         );
     }
     private String resolveState(ThreadReference t) {

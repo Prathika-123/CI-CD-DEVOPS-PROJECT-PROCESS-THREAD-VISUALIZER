@@ -108,4 +108,24 @@ public class ThreadController {
         return r;
     }
 
+    /** POST /api/step — resume JVM, capture one snapshot, suspend again */
+    @PostMapping("/step")
+    public Map<String, Object> step() throws InterruptedException {
+        // Resume briefly
+        jdiService.resumeVM();
+        // Wait 100ms for one instruction to execute
+        Thread.sleep(100);
+        // Suspend again
+        jdiService.suspendVM();
+        // Capture current state
+        List<ThreadInfo> threads = jdiService.getThreadsSnapshot();
+        // Push to WebSocket immediately
+        messagingTemplate.convertAndSend("/topic/threads", threads);
+
+        Map<String, Object> r = new HashMap<>();
+        r.put("message", "Stepped");
+        r.put("threads", threads.size());
+        return r;
+    }
+
 }

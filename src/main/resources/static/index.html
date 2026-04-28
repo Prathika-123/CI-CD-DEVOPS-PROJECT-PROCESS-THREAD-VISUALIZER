@@ -31,6 +31,12 @@
                    cursor:pointer;white-space:nowrap">
         ▶ Resume JVM
     </button>
+    <button onclick="stepJVM()"
+            style="font-size:11px;padding:4px 10px;background:transparent;
+               color:#8B5CF6;border:1px solid #8B5CF6;border-radius:4px;
+               cursor:pointer;white-space:nowrap">
+        ⏭ Step
+    </button>
     <div id="stats-bar">
         <span class="stat"><span id="total-count">0</span> threads</span>
         <span class="stat run-stat"><span id="run-count">0</span> running</span>
@@ -130,6 +136,7 @@
     let selectedThreadId = null;
     let historyLog = [];
     let previousStates = {};
+    let previousLines = {};
 
     // ── Main render — called every second ─────────────────────────
     function renderAll(threads) {
@@ -256,38 +263,84 @@
             </div>`;
     }
 
-    // ── History log ───────────────────────────────────────────────
-    function detectStateChanges(threads) {
-        const now = new Date().toLocaleTimeString();
-        threads.forEach(t => {
-            if (previousStates[t.id] === undefined) {
-                // First time seeing this thread — log initial state
-                historyLog.unshift({ time: now, name: t.name, state: t.state });
-            } else if (previousStates[t.id] !== t.state) {
-                // State changed — log it
-                historyLog.unshift({ time: now, name: t.name, state: t.state });
-            }
-            previousStates[t.id] = t.state;
-            if (historyLog.length > 100) historyLog.pop();
-        });
-        renderHistory();
-    }
+function detectStateChanges(threads) {
+    const now = new Date().toLocaleTimeString();
+    threads.forEach(t => {
+        const isNew = previousStates[t.id] === undefined;
+        const stateChanged = !isNew && previousStates[t.id] !== t.state;
+        const lineChanged = previousLines[t.id] !== undefined
+                            && previousLines[t.id] !== t.lineNumber
+                            && t.lineNumber > 0;
 
-    function renderHistory() {
-        document.getElementById('history-list').innerHTML = historyLog.slice(0, 50).map(e => `
+        if (isNew || stateChanged || lineChanged) {
+            historyLog.unshift({
+                time:      now,
+                name:      t.name,
+                state:     t.state,
+                method:    t.currentMethod,  // ← must have this
+                file:      t.sourceFile,     // ← must have this
+                line:      t.lineNumber,     // ← must have this
+                variables: t.variables || [] // ← must have this
+            });
+        }
+
+        previousStates[t.id] = t.state;
+        previousLines[t.id]  = t.lineNumber;
+        if (historyLog.length > 500) historyLog.pop(); // keep more history
+    });
+    renderHistory();
+}
+
+function renderHistory() {
+    document.getElementById('history-list').innerHTML =
+        historyLog.slice(0, 100).map(e => {
+            // Build variables string
+            const vars = e.variables && e.variables.length > 0
+                ? e.variables.map(v =>
+                    `<span class="h-var">
+                        <span class="h-var-name">${v.name}</span>
+                        <span class="h-var-eq">=</span>
+                        <span class="h-var-val">${v.value}</span>
+                        <span class="h-var-type">(${v.type})</span>
+                    </span>`
+                  ).join('')
+                : '';
+
+            const lineInfo = e.line > 0
+                ? `<span class="h-line">line ${e.line}</span>`
+                : '';
+
+            return `
             <div class="history-entry">
-                <span class="h-time">${e.time}</span>
-                <span class="h-name">${e.name}</span>
-                <span>→</span>
-                <span class="h-state ${e.state}">${e.state.replace('_', ' ')}</span>
-            </div>`).join('');
-    }
+                <div class="h-main-row">
+                    <span class="h-time">${e.time}</span>
+                    <span class="h-name">${e.name}</span>
+                    <span class="h-arrow">→</span>
+                    <span class="h-state ${e.state}">${e.state.replace('_', ' ')}</span>
+                    ${lineInfo}
+                </div>
+                ${e.method && e.method !== 'unknown' ? `
+                <div class="h-method-row">
+                    <span class="h-method-label">at</span>
+                    <span class="h-method">${e.method}</span>
+                    ${e.file !== '-' ? `<span class="h-file">${e.file}</span>` : ''}
+                </div>` : ''}
+                ${vars ? `<div class="h-vars-row">${vars}</div>` : ''}
+            </div>`;
+        }).join('');
+}
 
     function clearHistory() {
         historyLog = [];
         previousStates = {};
         renderHistory();
     }
+
+    function stepJVM() {
+    fetch('/api/step', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => console.log('Stepped:', d));
+}
 
     function suspendJVM() {
     fetch('/api/suspend', { method: 'POST' })
@@ -304,9 +357,32 @@ function resumeJVM() {
         .then(d => {
             document.getElementById('status-text').textContent = 'Connected to JVM';
             document.getElementById('status-dot').style.background = '#1D9E75';
+
+            // Immediately fetch threads right after resume
+            // so we capture the execution state before program finishes
+            fetch('/api/threads')
+                .then(r => r.json())
+                .then(threads => {
+                    renderAll(threads);
+                    // Force history log even if program finishes right after
+                    const now = new Date().toLocaleTimeString();
+                    threads.forEach(t => {
+                        historyLog.unshift({
+                            time: now,
+                            name: t.name,
+                            state: t.state,
+                            method: t.currentMethod,
+                            file: t.sourceFile,
+                            line: t.lineNumber,
+                            variables: t.variables || []
+                        });
+                        previousStates[t.id] = t.state;
+                        previousLines[t.id] = t.lineNumber;
+                    });
+                    renderHistory();
+                });
         });
 }
-
     // ── Start ─────────────────────────────────────────────────────
     connect();
 
