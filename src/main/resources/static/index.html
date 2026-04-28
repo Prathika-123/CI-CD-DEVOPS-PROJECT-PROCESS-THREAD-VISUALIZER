@@ -37,6 +37,22 @@
                cursor:pointer;white-space:nowrap">
         ⏭ Step
     </button>
+
+    <!-- Speed control — add after your ⏭ Step button -->
+    <div id="speed-control">
+        <span style="font-size:11px;color:#aaa">Speed</span>
+        <span style="font-size:10px;color:#aaa">Fast</span>
+        <input type="range" id="speed-slider"
+               min="0" max="2000" step="100" value="500"
+               style="width:100px;accent-color:#8B5CF6;cursor:pointer"
+               oninput="updateSpeed(this.value)">
+        <span style="font-size:10px;color:#aaa">Slow</span>
+        <span id="speed-label"
+              style="font-size:11px;color:#8B5CF6;min-width:45px">
+        500ms
+    </span>
+    </div>
+
     <div id="stats-bar">
         <span class="stat"><span id="total-count">0</span> threads</span>
         <span class="stat run-stat"><span id="run-count">0</span> running</span>
@@ -62,24 +78,35 @@
         </div>
     </div>
 
+    <div id="sidebar-resizer"></div>
+
     <div id="sidebar">
         <div id="detail-card">
-            <div id="detail-header">Click a thread node to inspect</div>
-            <div id="detail-body"></div>
+            <div class="panel-title" onclick="togglePanel(this)">THREAD DETAILS</div>
+            <div class="panel-body">
+                <div id="detail-header">Click a thread node to inspect</div>
+                <div id="detail-body"></div>
+            </div>
         </div>
         <div id="thread-panel">
-            <div class="panel-title">All Threads</div>
-            <div id="thread-list"></div>
+            <div class="panel-title" onclick="togglePanel(this)">
+                All Threads
+            </div>
+            <div class="panel-body">
+                <div id="thread-list"></div>
+            </div>
         </div>
         <div id="history-panel">
-            <div class="panel-title">
+            <div class="panel-title" onclick="togglePanel(this)">
                 Execution History
-                <button onclick="clearHistory()"
-                        style="float:right;font-size:10px;padding:2px 8px;cursor:pointer">
+                <button onclick="event.stopPropagation(); clearHistory()"
+                        style="font-size:10px;padding:2px 8px;cursor:pointer;margin-left:auto">
                     Clear
                 </button>
             </div>
-            <div id="history-list"></div>
+            <div class="panel-body">
+                <div id="history-list"></div>
+            </div>
         </div>
     </div>
 
@@ -383,6 +410,53 @@ function resumeJVM() {
                 });
         });
 }
+        function updateSpeed(value) {
+    document.getElementById('speed-label').textContent =
+        value == 0 ? 'Max' : value + 'ms';
+
+    fetch('/api/speed?delayMs=' + value, { method: 'POST' })
+        .catch(e => console.error('Speed update failed:', e));
+}
+
+// ── Collapsible panels ────────────────────────────────────
+function togglePanel(titleEl) {
+    const body = titleEl.nextElementSibling;
+    const isCollapsed = body.classList.toggle('collapsed');
+    titleEl.classList.toggle('collapsed', isCollapsed);
+}
+
+// ── Draggable sidebar resizer ─────────────────────────────
+(function() {
+    const resizer  = document.getElementById('sidebar-resizer');
+    const sidebar  = document.getElementById('sidebar');
+    let startX, startWidth;
+
+    resizer.addEventListener('mousedown', e => {
+        startX     = e.clientX;
+        startWidth = sidebar.offsetWidth;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        function onMove(e) {
+            // Dragging left = wider sidebar (resizer is to the LEFT of sidebar)
+            const delta = startX - e.clientX;
+            const newWidth = Math.min(600, Math.max(220, startWidth + delta));
+            sidebar.style.width = newWidth + 'px';
+        }
+
+        function onUp() {
+            resizer.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+})();
     // ── Start ─────────────────────────────────────────────────────
     connect();
 

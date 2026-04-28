@@ -36,16 +36,19 @@ public class ThreadController {
 
     @PostConstruct
     public void init() {
-        System.out.println("Attempting to connect to target JVM at " + jdiHost + ":" + jdiPort + "...");
         boolean ok = jdiService.connect(jdiHost, jdiPort);
-        if (!ok) {
+        if (ok) {
+            // Start the event-driven loop — no more 1-second polling needed
+            jdiService.startEventLoop(messagingTemplate);
+        }
+        else if (!ok) {
             System.out.println("⚠️  Could not connect at startup.");
             System.out.println("   Use POST /api/connect to retry after starting the target program.");
         }
     }
 
 
-    @Scheduled(fixedRate = 1000)
+    @Scheduled(fixedRate = 2000)
     public void pushThreadData() {
         if (!jdiService.isConnected()) return;
         // Uses suspend→read→resume so we get EXACT line numbers
@@ -70,23 +73,24 @@ public class ThreadController {
         return jdiService.getThreads();
     }
 
-    /** POST /api/connect — manually reconnect to target JVM */
     @PostMapping("/connect")
     public Map<String, Object> connect(
             @RequestParam(defaultValue = "localhost") String host,
             @RequestParam(defaultValue = "5005") int port) {
 
+        jdiService.stopEventLoop(); // stop old loop if any
         boolean ok = jdiService.connect(host, port);
+        if (ok) jdiService.startEventLoop(messagingTemplate);
+
         Map<String, Object> resp = new HashMap<>();
         resp.put("success", ok);
-        resp.put("message", ok ? "Connected to JVM at " + host + ":" + port
-                : "Failed to connect. Is the target program running with -agentlib:jdwp?");
+        resp.put("message", ok ? "Connected" : "Failed to connect");
         return resp;
     }
 
-    /** Called when Spring Boot shuts down — cleanly disconnect from target JVM */
     @PreDestroy
     public void cleanup() {
+        jdiService.stopEventLoop();
         jdiService.disconnect();
     }
 
@@ -128,4 +132,20 @@ public class ThreadController {
         return r;
     }
 
+
+    @PostMapping("/speed")
+    public Map<String, Object> setSpeed(@RequestParam long delayMs) {
+        jdiService.setStepDelay(delayMs);
+        Map<String, Object> r = new HashMap<>();
+        r.put("delayMs", delayMs);
+        r.put("message", "Speed updated");
+        return r;
+    }
+
+    @GetMapping("/speed")
+    public Map<String, Object> getSpeed() {
+        Map<String, Object> r = new HashMap<>();
+        r.put("delayMs", jdiService.getStepDelay());
+        return r;
+    }
 }

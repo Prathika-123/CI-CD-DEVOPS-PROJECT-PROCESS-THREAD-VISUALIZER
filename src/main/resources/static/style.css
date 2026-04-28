@@ -243,3 +243,71 @@ body {
 .h-var-eq { color: #999; }
 .h-var-val { color: #1D9E75; font-weight: 700; }
 .h-var-type { color: #bbb; font-style: italic; }
+
+/* Resizable sidebar */
+#main-layout {
+    display: flex;
+    position: relative;
+}
+
+#sidebar-resizer {
+    width: 5px;
+    cursor: col-resize;
+    background: transparent;
+    border-left: 1px solid #2a2a3a;
+    transition: border-color 0.2s;
+    flex-shrink: 0;
+    order: 1;
+}
+#sidebar-resizer:hover, #sidebar-resizer.dragging {
+    border-color: #8B5CF6;
+}
+
+#sidebar {
+    order: 2;
+    min-width: 220px;
+    max-width: 600px;
+    width: 320px;
+    overflow: hidden;
+}
+
+/* Collapsible panel headers */
+.panel-title {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.panel-title::after {
+    content: '▲';
+    font-size: 10px;
+    color: #666;
+    transition: transform 0.2s;
+}
+
+.panel-title.collapsed::after {
+    transform: rotate(180deg);
+}
+
+.panel-body {
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+    max-height: 2000px; /* large enough */
+}
+
+.panel-body.collapsed {
+    max-height: 0;
+}
+
+/* Detail card collapsible */
+#detail-card .panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #888;
+    padding: 10px 14px 6px;
+    border-bottom: 1px solid #1e1e2e;
+    margin: 0;
+}

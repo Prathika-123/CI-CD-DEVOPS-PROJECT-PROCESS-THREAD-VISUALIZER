@@ -3,10 +3,13 @@ package processThreadVisualizer.PTV.jdi;
 import com.sun.jdi.*;
 import com.sun.jdi.connect.AttachingConnector;
 import com.sun.jdi.connect.Connector;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import processThreadVisualizer.PTV.model.ThreadInfo;
 import com.sun.jdi.LocalVariable;
 import com.sun.jdi.Value;
+import com.sun.jdi.event.*;
+import com.sun.jdi.request.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,7 +20,8 @@ public class JdiService {
 
     private VirtualMachine vm = null;
     private boolean connected = false;
-
+    private Thread eventThread = null;
+    private volatile long stepDelayMs = 500;
 
     public boolean connect(String host, int port) {
         try {
@@ -225,5 +229,113 @@ public class JdiService {
             vm = null;
             return Collections.emptyList();
         }
+    }
+
+    //new methods
+    public void enableLineBreakpointsForUserCode() {
+        if (vm == null) return;
+
+        EventRequestManager erm = vm.eventRequestManager();
+
+        // Request a notification for every single step in user code
+        // This fires after EVERY line executes — no Thread.sleep needed
+        for (ThreadReference thread : vm.allThreads()) {
+            StepRequest stepRequest = erm.createStepRequest(
+                    thread,
+                    StepRequest.STEP_LINE,   // granularity: one source line at a time
+                    StepRequest.STEP_INTO    // step into method calls too
+            );
+
+            // Only fire for YOUR code, not JDK internals
+            stepRequest.addClassExclusionFilter("java.*");
+            stepRequest.addClassExclusionFilter("javax.*");
+            stepRequest.addClassExclusionFilter("sun.*");
+            stepRequest.addClassExclusionFilter("jdk.*");
+            stepRequest.addClassExclusionFilter("com.sun.*");
+
+            stepRequest.setSuspendPolicy(StepRequest.SUSPEND_EVENT_THREAD);
+            stepRequest.enable();
+        }
+    }
+
+    public void startEventLoop(SimpMessagingTemplate messagingTemplate) {
+        if (vm == null) return;
+
+        enableLineBreakpointsForUserCode();
+
+        eventThread = new Thread(() -> {
+            EventQueue eventQueue = vm.eventQueue();
+
+            while (connected && vm != null) {
+                try {
+                    EventSet eventSet = eventQueue.remove(1000); // wait up to 1s
+                    if (eventSet == null) continue;
+
+                    for (Event event : eventSet) {
+
+                        if (event instanceof StepEvent stepEvent) {
+                            ThreadReference thread = stepEvent.thread();
+                            Location loc = stepEvent.location();
+                            String className = loc.declaringType().name();
+
+                            if (!className.startsWith("java.") &&
+                                    !className.startsWith("sun.")  &&
+                                    !className.startsWith("jdk.")) {
+
+                                List<ThreadInfo> threads = vm.allThreads()
+                                        .stream()
+                                        .map(this::buildThreadInfo)
+                                        .collect(Collectors.toList());
+
+                                messagingTemplate.convertAndSend("/topic/threads", threads);
+
+                                // ← ADD THIS: wait before resuming
+                                if (stepDelayMs > 0) {
+                                    try { Thread.sleep(stepDelayMs); }
+                                    catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
+                                        return;
+                                    }
+                                }
+                            }
+
+                            eventSet.resume();
+                        }
+                        else if (event instanceof VMDeathEvent ||
+                                event instanceof VMDisconnectEvent) {
+                            connected = false;
+                            vm = null;
+                            return;
+                        }
+                    }
+
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (VMDisconnectedException e) {
+                    connected = false;
+                    vm = null;
+                    return;
+                }
+            }
+        });
+
+        eventThread.setDaemon(true);
+        eventThread.start();
+    }
+
+    public void stopEventLoop() {
+        if (eventThread != null) {
+            eventThread.interrupt();
+            eventThread = null;
+        }
+    }
+
+    public void setStepDelay(long ms) {
+        this.stepDelayMs = ms;
+    }
+
+    public long getStepDelay() {
+        return stepDelayMs;
     }
 }
