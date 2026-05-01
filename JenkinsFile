@@ -8,12 +8,6 @@ pipeline {
 
     stages {
 
-        stage('Clone Code') {
-            steps {
-                git 'https://github.com/PoojaB24/CI-CD-DEVOPS-PROJECT-PROCESS-THREAD-VISUALIZER.git'
-            }
-        }
-
         stage('Build') {
             steps {
                 sh 'mvn clean install'
