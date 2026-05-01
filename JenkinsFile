@@ -1,0 +1,41 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven'
+        jdk 'JDK'
+    }
+
+    stages {
+
+        stage('Clone Code') {
+            steps {
+                git 'https://github.com/PoojaB24/CI-CD-DEVOPS-PROJECT-PROCESS-THREAD-VISUALIZER.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean install'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+
+        stage('Deploy Local') {
+            steps {
+                sh 'java -jar target/*.jar'
+            }
+        }
+    }
+}
