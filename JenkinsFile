@@ -28,7 +28,7 @@ pipeline {
 
         stage('Deploy Local') {
             steps {
-                sh 'nohup java -jar target/*.jar > app.log 2>&1 &'
+                sh 'nohup java -jar target/PTV-0.0.1-SNAPSHOT.jar --server.address=0.0.0.0 > app.log 2>&1 &'
             }
         }
     }
