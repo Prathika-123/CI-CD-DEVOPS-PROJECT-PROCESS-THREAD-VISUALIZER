@@ -28,7 +28,7 @@ pipeline {
 
         stage('Deploy Local') {
             steps {
-                sh 'java -jar target/*.jar'
+                sh 'nohup java -jar target/*.jar > app.log 2>&1 &'
             }
         }
     }
