@@ -2,27 +2,33 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'
-        jdk 'JDK'
+        maven 'Maven'   // configure in Jenkins tools
     }
 
     stages {
 
+        stage('Clone') {
+            steps {
+                git 'https://github.com/PoojaB24/CI-CD-DEVOPS-PROJECT-PROCESS-THREAD-VISUALIZER.git'
+            }
+        }
+
         stage('Build') {
             steps {
-                sh 'mvn clean install'
+                sh 'mvn clean compile'
             }
         }
 
-        stage('Test') {
+        stage('SonarQube Analysis') {
             steps {
-                sh 'mvn test'
-            }
-        }
-
-        stage('Package') {
-            steps {
-                sh 'mvn package'
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=my-project \
+                    -Dsonar.host.url=http://host.docker.internal:9000 \
+                    -Dsonar.login=sqa_c01a28736407db685c5a10ca982160c7859b8afb
+                    '''
+                }
             }
         }
     }
