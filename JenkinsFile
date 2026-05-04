@@ -3,12 +3,6 @@ pipeline {
 
     stages {
 
-        stage('Clone') {
-            steps {
-                git 'https://github.com/PoojaB24/CI-CD-DEVOPS-PROJECT-PROCESS-THREAD-VISUALIZER.git'
-            }
-        }
-
         stage('Build') {
             steps {
                 sh 'mvn clean compile'
@@ -21,7 +15,6 @@ pipeline {
                     sh '''
                     mvn sonar:sonar \
                     -Dsonar.projectKey=my-project \
-                    -Dsonar.host.url=http://host.docker.internal:9000 \
                     -Dsonar.login=sqa_c01a28736407db685c5a10ca982160c7859b8afb
                     '''
                 }
