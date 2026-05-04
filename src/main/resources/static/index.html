@@ -37,8 +37,6 @@
                cursor:pointer;white-space:nowrap">
         ⏭ Step
     </button>
-
-    <!-- Speed control — add after your ⏭ Step button -->
     <div id="speed-control">
         <span style="font-size:11px;color:#aaa">Speed</span>
         <span style="font-size:10px;color:#aaa">Fast</span>
@@ -47,12 +45,8 @@
                style="width:100px;accent-color:#8B5CF6;cursor:pointer"
                oninput="updateSpeed(this.value)">
         <span style="font-size:10px;color:#aaa">Slow</span>
-        <span id="speed-label"
-              style="font-size:11px;color:#8B5CF6;min-width:45px">
-        500ms
-    </span>
+        <span id="speed-label" style="font-size:11px;color:#8B5CF6;min-width:45px">500ms</span>
     </div>
-
     <div id="stats-bar">
         <span class="stat"><span id="total-count">0</span> threads</span>
         <span class="stat run-stat"><span id="run-count">0</span> running</span>
@@ -81,6 +75,8 @@
     <div id="sidebar-resizer"></div>
 
     <div id="sidebar">
+
+        <!-- THREAD DETAILS — collapsible -->
         <div id="detail-card">
             <div class="panel-title" onclick="togglePanel(this)">THREAD DETAILS</div>
             <div class="panel-body">
@@ -88,14 +84,15 @@
                 <div id="detail-body"></div>
             </div>
         </div>
+
+        <!-- ALL THREADS — collapsible, fixed height, scrolls inside -->
         <div id="thread-panel">
-            <div class="panel-title" onclick="togglePanel(this)">
-                All Threads
-            </div>
-            <div class="panel-body">
-                <div id="thread-list"></div>
-            </div>
+            <div class="panel-title" onclick="togglePanel(this)">All Threads</div>
+            <!-- NO panel-body wrapper — thread-list scrolls directly -->
+            <div id="thread-list"></div>
         </div>
+
+        <!-- EXECUTION HISTORY — takes remaining height, scrolls inside -->
         <div id="history-panel">
             <div class="panel-title" onclick="togglePanel(this)">
                 Execution History
@@ -104,17 +101,14 @@
                     Clear
                 </button>
             </div>
-            <div class="panel-body">
-                <div id="history-list"></div>
-            </div>
+            <!-- NO panel-body wrapper — history-list scrolls directly -->
+            <div id="history-list"></div>
         </div>
-    </div>
 
+    </div>
 </div>
 
 <script>
-
-    // ── Fallback: poll REST API every second if WebSocket fails ───
     function pollREST() {
         setInterval(() => {
             fetch('/api/threads')
@@ -126,13 +120,11 @@
         document.getElementById('status-text').textContent = 'Connected (polling)';
     }
 
-    // ── WebSocket connection ───────────────────────────────────────
     function connect() {
         try {
             const socket = new SockJS('/ws');
             const stomp = Stomp.over(socket);
             stomp.debug = null;
-
             stomp.connect({}, () => {
                 setStatus(true);
                 stomp.subscribe('/topic/threads', msg => {
@@ -159,13 +151,11 @@
         document.getElementById('status-text').textContent = ok ? 'Connected to JVM' : 'Disconnected';
     }
 
-    // ── State ─────────────────────────────────────────────────────
     let selectedThreadId = null;
     let historyLog = [];
     let previousStates = {};
     let previousLines = {};
 
-    // ── Main render — called every second ─────────────────────────
     function renderAll(threads) {
         updateStats(threads);
         renderProcessCircle(threads);
@@ -177,7 +167,6 @@
         }
     }
 
-    // ── Stats bar ─────────────────────────────────────────────────
     function updateStats(threads) {
         document.getElementById('total-count').textContent = threads.length;
         document.getElementById('run-count').textContent =
@@ -188,55 +177,46 @@
             threads.filter(t => t.state === 'WAITING' || t.state === 'TIMED_WAITING').length;
     }
 
-    // ── Process circle ────────────────────────────────────────────
     function renderProcessCircle(threads) {
-    const container = document.getElementById('thread-nodes');
-    container.innerHTML = '';
-    if (!threads.length) return;
-
-    // Read actual rendered size — no more hardcoding!
-    const circle = document.getElementById('process-circle');
-    const circleSize = circle.offsetWidth;   // actual rendered px
-    const center = circleSize / 2;
-    const nodeSize = 52;
-    const nodeRadius = nodeSize / 2;
-    const orbitRadius = center - nodeRadius - 20;
-
-    threads.forEach((thread, index) => {
-        const angle = (2 * Math.PI * index / threads.length) - (Math.PI / 2);
-        const x = center + orbitRadius * Math.cos(angle) - nodeRadius;
-        const y = center + orbitRadius * Math.sin(angle) - nodeRadius;
-
-        const node = document.createElement('div');
-        node.className = 'thread-node ' + thread.state;
-        node.id = 'node-' + thread.id;
-        if (thread.id === selectedThreadId) node.classList.add('selected');
-        node.style.left = x + 'px';
-        node.style.top  = y + 'px';
-        node.textContent = thread.name.length > 7
-            ? thread.name.substring(0, 6) + '..'
-            : thread.name;
-        node.title = thread.name + '\nState: ' + thread.state + '\nMethod: ' + thread.currentMethod;
-
-        node.addEventListener('click', () => {
-            selectedThreadId = thread.id;
-            renderDetailCard(thread);
-            document.querySelectorAll('.thread-node').forEach(n => n.classList.remove('selected'));
-            document.querySelectorAll('.thread-row').forEach(r => r.classList.remove('selected'));
-            node.classList.add('selected');
-            const row = document.getElementById('row-' + thread.id);
-            if (row) row.classList.add('selected');
+        const container = document.getElementById('thread-nodes');
+        container.innerHTML = '';
+        if (!threads.length) return;
+        const circle = document.getElementById('process-circle');
+        const circleSize = circle.offsetWidth;
+        const center = circleSize / 2;
+        const nodeSize = 52;
+        const nodeRadius = nodeSize / 2;
+        const orbitRadius = center - nodeRadius - 20;
+        threads.forEach((thread, index) => {
+            const angle = (2 * Math.PI * index / threads.length) - (Math.PI / 2);
+            const x = center + orbitRadius * Math.cos(angle) - nodeRadius;
+            const y = center + orbitRadius * Math.sin(angle) - nodeRadius;
+            const node = document.createElement('div');
+            node.className = 'thread-node ' + thread.state;
+            node.id = 'node-' + thread.id;
+            if (thread.id === selectedThreadId) node.classList.add('selected');
+            node.style.left = x + 'px';
+            node.style.top  = y + 'px';
+            node.textContent = thread.name.length > 7
+                ? thread.name.substring(0, 6) + '..'
+                : thread.name;
+            node.title = thread.name + '\nState: ' + thread.state + '\nMethod: ' + thread.currentMethod;
+            node.addEventListener('click', () => {
+                selectedThreadId = thread.id;
+                renderDetailCard(thread);
+                document.querySelectorAll('.thread-node').forEach(n => n.classList.remove('selected'));
+                document.querySelectorAll('.thread-row').forEach(r => r.classList.remove('selected'));
+                node.classList.add('selected');
+                const row = document.getElementById('row-' + thread.id);
+                if (row) row.classList.add('selected');
+            });
+            container.appendChild(node);
         });
+    }
 
-        container.appendChild(node);
-    });
-}
-
-    // ── Sidebar thread list ───────────────────────────────────────
     function renderThreadList(threads) {
         const list = document.getElementById('thread-list');
         list.innerHTML = '';
-
         threads.forEach(thread => {
             const row = document.createElement('div');
             row.className = 'thread-row' + (thread.id === selectedThreadId ? ' selected' : '');
@@ -245,7 +225,6 @@
                 <span class="badge ${thread.state}">${thread.state.replace('_', ' ')}</span>
                 <span class="tname">${thread.name}</span>
                 <span class="tmethod">${thread.currentMethod}</span>`;
-
             row.addEventListener('click', () => {
                 selectedThreadId = thread.id;
                 renderDetailCard(thread);
@@ -255,12 +234,10 @@
                 const node = document.getElementById('node-' + thread.id);
                 if (node) node.classList.add('selected');
             });
-
             list.appendChild(row);
         });
     }
 
-    // ── Detail card ───────────────────────────────────────────────
     function renderDetailCard(t) {
         document.getElementById('detail-header').textContent = 'Thread details';
         document.getElementById('detail-body').innerHTML = `
@@ -268,94 +245,78 @@
                 ${t.name}
                 <span class="badge ${t.state}" style="margin-left:6px">${t.state.replace('_', ' ')}</span>
             </div>
-            <div class="detail-row">
-                <span class="label">Thread ID</span>
-                <span class="value">${t.id}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Group</span>
-                <span class="value">${t.threadGroup}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Method</span>
-                <span class="value" title="${t.currentMethod}">${t.currentMethod}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Source file</span>
-                <span class="value">${t.sourceFile}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Line number</span>
-                <span class="value">${t.lineNumber > 0 ? t.lineNumber : '-'}</span>
-            </div>`;
+            <div class="detail-row"><span class="label">Thread ID</span><span class="value">${t.id}</span></div>
+            <div class="detail-row"><span class="label">Group</span><span class="value">${t.threadGroup}</span></div>
+            <div class="detail-row"><span class="label">Method</span><span class="value" title="${t.currentMethod}">${t.currentMethod}</span></div>
+            <div class="detail-row"><span class="label">Source file</span><span class="value">${t.sourceFile}</span></div>
+            <div class="detail-row"><span class="label">Line number</span><span class="value">${t.lineNumber > 0 ? t.lineNumber : '-'}</span></div>`;
     }
 
-function detectStateChanges(threads) {
-    const now = new Date().toLocaleTimeString();
-    threads.forEach(t => {
-        const isNew = previousStates[t.id] === undefined;
-        const stateChanged = !isNew && previousStates[t.id] !== t.state;
-        const lineChanged = previousLines[t.id] !== undefined
-                            && previousLines[t.id] !== t.lineNumber
-                            && t.lineNumber > 0;
+    function detectStateChanges(threads) {
+        const now = new Date().toLocaleTimeString();
+        threads.forEach(t => {
+            const isNew = previousStates[t.id] === undefined;
+            const stateChanged = !isNew && previousStates[t.id] !== t.state;
+            const lineChanged = previousLines[t.id] !== undefined
+                                && previousLines[t.id] !== t.lineNumber
+                                && t.lineNumber > 0;
+            if (isNew || stateChanged || lineChanged) {
+                historyLog.unshift({
+                    time:      now,
+                    name:      t.name,
+                    state:     t.state,
+                    method:    t.currentMethod,
+                    file:      t.sourceFile,
+                    line:      t.lineNumber,
+                    variables: t.variables || []
+                });
+            }
+            previousStates[t.id] = t.state;
+            previousLines[t.id]  = t.lineNumber;
+            if (historyLog.length > 500) historyLog.pop();
+        });
+        renderHistory();
+    }
 
-        if (isNew || stateChanged || lineChanged) {
-            historyLog.unshift({
-                time:      now,
-                name:      t.name,
-                state:     t.state,
-                method:    t.currentMethod,  // ← must have this
-                file:      t.sourceFile,     // ← must have this
-                line:      t.lineNumber,     // ← must have this
-                variables: t.variables || [] // ← must have this
-            });
-        }
+    function renderHistory() {
+        document.getElementById('history-list').innerHTML =
+            historyLog.slice(0, 100).map(e => {
+                const lineInfo = e.line > 0
+                    ? `<span class="h-line">line ${e.line}</span>` : '';
 
-        previousStates[t.id] = t.state;
-        previousLines[t.id]  = t.lineNumber;
-        if (historyLog.length > 500) historyLog.pop(); // keep more history
-    });
-    renderHistory();
-}
+                const methodRow = e.method && e.method !== 'unknown' ? `
+                    <div class="h-method-row">
+                        <span class="h-method-label">at</span>
+                        <span class="h-method">${e.method}</span>
+                        ${e.file !== '-' ? `<span class="h-file">${e.file}</span>` : ''}
+                    </div>` : '';
 
-function renderHistory() {
-    document.getElementById('history-list').innerHTML =
-        historyLog.slice(0, 100).map(e => {
-            // Build variables string
-            const vars = e.variables && e.variables.length > 0
-                ? e.variables.map(v =>
-                    `<span class="h-var">
-                        <span class="h-var-name">${v.name}</span>
-                        <span class="h-var-eq">=</span>
-                        <span class="h-var-val">${v.value}</span>
-                        <span class="h-var-type">(${v.type})</span>
-                    </span>`
-                  ).join('')
-                : '';
+                const vars = e.variables && e.variables.length > 0
+                    ? `<div class="h-vars-row">${
+                        e.variables.map(v =>
+                            `<span class="h-var">
+                                <span class="h-var-name">${v.name}</span>
+                                <span class="h-var-eq">=</span>
+                                <span class="h-var-val">${v.value}</span>
+                                <span class="h-var-type">(${v.type})</span>
+                            </span>`
+                        ).join('')
+                    }</div>` : '';
 
-            const lineInfo = e.line > 0
-                ? `<span class="h-line">line ${e.line}</span>`
-                : '';
-
-            return `
-            <div class="history-entry">
-                <div class="h-main-row">
-                    <span class="h-time">${e.time}</span>
-                    <span class="h-name">${e.name}</span>
-                    <span class="h-arrow">→</span>
-                    <span class="h-state ${e.state}">${e.state.replace('_', ' ')}</span>
-                    ${lineInfo}
-                </div>
-                ${e.method && e.method !== 'unknown' ? `
-                <div class="h-method-row">
-                    <span class="h-method-label">at</span>
-                    <span class="h-method">${e.method}</span>
-                    ${e.file !== '-' ? `<span class="h-file">${e.file}</span>` : ''}
-                </div>` : ''}
-                ${vars ? `<div class="h-vars-row">${vars}</div>` : ''}
-            </div>`;
-        }).join('');
-}
+                return `
+                <div class="history-entry">
+                    <div class="h-main-row">
+                        <span class="h-time">${e.time}</span>
+                        <span class="h-name">${e.name}</span>
+                        <span class="h-arrow">→</span>
+                        <span class="h-state ${e.state}">${e.state.replace('_', ' ')}</span>
+                        ${lineInfo}
+                    </div>
+                    ${methodRow}
+                    ${vars}
+                </div>`;
+            }).join('');
+    }
 
     function clearHistory() {
         historyLog = [];
@@ -364,102 +325,86 @@ function renderHistory() {
     }
 
     function stepJVM() {
-    fetch('/api/step', { method: 'POST' })
-        .then(r => r.json())
-        .then(d => console.log('Stepped:', d));
-}
+        fetch('/api/step', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => console.log('Stepped:', d));
+    }
 
     function suspendJVM() {
-    fetch('/api/suspend', { method: 'POST' })
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById('status-text').textContent = '⏸ JVM Paused';
-            document.getElementById('status-dot').style.background = '#EF9F27';
-        });
-}
+        fetch('/api/suspend', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('status-text').textContent = '⏸ JVM Paused';
+                document.getElementById('status-dot').style.background = '#EF9F27';
+            });
+    }
 
-function resumeJVM() {
-    fetch('/api/resume', { method: 'POST' })
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById('status-text').textContent = 'Connected to JVM';
-            document.getElementById('status-dot').style.background = '#1D9E75';
-
-            // Immediately fetch threads right after resume
-            // so we capture the execution state before program finishes
-            fetch('/api/threads')
-                .then(r => r.json())
-                .then(threads => {
-                    renderAll(threads);
-                    // Force history log even if program finishes right after
-                    const now = new Date().toLocaleTimeString();
-                    threads.forEach(t => {
-                        historyLog.unshift({
-                            time: now,
-                            name: t.name,
-                            state: t.state,
-                            method: t.currentMethod,
-                            file: t.sourceFile,
-                            line: t.lineNumber,
-                            variables: t.variables || []
+    function resumeJVM() {
+        fetch('/api/resume', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('status-text').textContent = 'Connected to JVM';
+                document.getElementById('status-dot').style.background = '#1D9E75';
+                fetch('/api/threads')
+                    .then(r => r.json())
+                    .then(threads => {
+                        renderAll(threads);
+                        const now = new Date().toLocaleTimeString();
+                        threads.forEach(t => {
+                            historyLog.unshift({
+                                time: now, name: t.name, state: t.state,
+                                method: t.currentMethod, file: t.sourceFile,
+                                line: t.lineNumber, variables: t.variables || []
+                            });
+                            previousStates[t.id] = t.state;
+                            previousLines[t.id] = t.lineNumber;
                         });
-                        previousStates[t.id] = t.state;
-                        previousLines[t.id] = t.lineNumber;
+                        renderHistory();
                     });
-                    renderHistory();
-                });
+            });
+    }
+
+    function updateSpeed(value) {
+        document.getElementById('speed-label').textContent =
+            value == 0 ? 'Max' : value + 'ms';
+        fetch('/api/speed?delayMs=' + value, { method: 'POST' })
+            .catch(e => console.error('Speed update failed:', e));
+    }
+
+    function togglePanel(titleEl) {
+        const body = titleEl.nextElementSibling;
+        const isCollapsed = body.classList.toggle('collapsed');
+        titleEl.classList.toggle('collapsed', isCollapsed);
+    }
+
+    (function() {
+        const resizer = document.getElementById('sidebar-resizer');
+        const sidebar = document.getElementById('sidebar');
+        let startX, startWidth;
+        resizer.addEventListener('mousedown', e => {
+            startX     = e.clientX;
+            startWidth = sidebar.offsetWidth;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            function onMove(e) {
+                const delta = startX - e.clientX;
+                const newWidth = Math.min(600, Math.max(220, startWidth + delta));
+                sidebar.style.width = newWidth + 'px';
+            }
+            function onUp() {
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
         });
-}
-        function updateSpeed(value) {
-    document.getElementById('speed-label').textContent =
-        value == 0 ? 'Max' : value + 'ms';
+    })();
 
-    fetch('/api/speed?delayMs=' + value, { method: 'POST' })
-        .catch(e => console.error('Speed update failed:', e));
-}
-
-// ── Collapsible panels ────────────────────────────────────
-function togglePanel(titleEl) {
-    const body = titleEl.nextElementSibling;
-    const isCollapsed = body.classList.toggle('collapsed');
-    titleEl.classList.toggle('collapsed', isCollapsed);
-}
-
-// ── Draggable sidebar resizer ─────────────────────────────
-(function() {
-    const resizer  = document.getElementById('sidebar-resizer');
-    const sidebar  = document.getElementById('sidebar');
-    let startX, startWidth;
-
-    resizer.addEventListener('mousedown', e => {
-        startX     = e.clientX;
-        startWidth = sidebar.offsetWidth;
-        resizer.classList.add('dragging');
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-
-        function onMove(e) {
-            // Dragging left = wider sidebar (resizer is to the LEFT of sidebar)
-            const delta = startX - e.clientX;
-            const newWidth = Math.min(600, Math.max(220, startWidth + delta));
-            sidebar.style.width = newWidth + 'px';
-        }
-
-        function onUp() {
-            resizer.classList.remove('dragging');
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-        }
-
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-    });
-})();
-    // ── Start ─────────────────────────────────────────────────────
     connect();
-
 </script>
 </body>
 </html>
