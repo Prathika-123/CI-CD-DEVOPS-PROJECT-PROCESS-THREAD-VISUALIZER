@@ -89,7 +89,7 @@ with Maven, add to `pom.xml`:
 ### Step 2 — Run your target program with JDWP enabled
 
 ```bash
-java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005
+-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005
 ```
 
 The program runs normally — the only difference is the `-agentlib` flag which opens a debug port.
