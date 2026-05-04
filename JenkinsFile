@@ -19,7 +19,7 @@ pipeline {
                     sh '''
                         mvn sonar:sonar \
                         -Dsonar.projectKey=my-project \
-                        -Dsonar.login=sqa_c01a28736407db685c5a10ca982160c7859b8afb
+                        -Dsonar.login=sqa_158f5a9877000eee44cd895b2634565e68965b78
                     '''
                 }
             }
