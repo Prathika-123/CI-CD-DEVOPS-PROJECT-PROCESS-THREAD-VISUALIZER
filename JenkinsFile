@@ -52,7 +52,7 @@ pipeline {
                 docker rm $CONTAINER_NAME || true
 
                 docker run \
-                -p $PORT:8080 \
+                -p $PORT:8081 \
                 --name $CONTAINER_NAME \
                 $IMAGE_NAME:latest
                 '''
