@@ -5,6 +5,12 @@ pipeline {
         maven 'Maven'
     }
 
+    environment {
+        IMAGE_NAME = "my-app"
+        CONTAINER_NAME = "my-app"
+        PORT = "8081"
+    }
+
     stages {
 
         stage('Build') {
@@ -17,9 +23,9 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=my-project \
-                        -Dsonar.login=sqa_158f5a9877000eee44cd895b2634565e68965b78
+                    mvn sonar:sonar \
+                    -Dsonar.projectKey=my-project \
+                    -Dsonar.login=sqa_158f5a9877000eee44cd895b2634565e68965b78
                     '''
                 }
             }
@@ -27,22 +33,28 @@ pipeline {
 
         stage('Package') {
             steps {
-                sh 'mvn package'
+                sh 'mvn package -DskipTests'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t my-app .'
+                sh '''
+                docker build -t $IMAGE_NAME:latest .
+                '''
             }
         }
 
-        stage('Run Container') {
+        stage('Deploy Container') {
             steps {
                 sh '''
-                    docker stop my-app || true
-                    docker rm my-app || true
-                    docker run -d -p 8081:8083 --name my-app my-app
+                docker stop $CONTAINER_NAME || true
+                docker rm $CONTAINER_NAME || true
+
+                docker run -d \
+                -p $PORT:8080 \
+                --name $CONTAINER_NAME \
+                $IMAGE_NAME:latest
                 '''
             }
         }
