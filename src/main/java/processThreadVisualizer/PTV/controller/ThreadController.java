@@ -36,7 +36,12 @@ public class ThreadController {
 
     @PostConstruct
     public void init() {
-        boolean ok = jdiService.connect(jdiHost, jdiPort);
+       
+ try {
+         boolean ok = jdiService.connect(jdiHost, jdiPort);
+    } catch (Exception e) {
+        System.out.println("⚠️ Skipping JDI connection (not available in container)");
+    }
         if (ok) {
             // Start the event-driven loop — no more 1-second polling needed
             jdiService.startEventLoop(messagingTemplate);
