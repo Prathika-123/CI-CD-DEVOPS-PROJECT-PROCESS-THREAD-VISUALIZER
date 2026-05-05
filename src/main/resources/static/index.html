@@ -76,7 +76,7 @@
 
     <div id="sidebar">
 
-        <!-- THREAD DETAILS — collapsible -->
+        <!-- THREAD DETAILS -->
         <div id="detail-card">
             <div class="panel-title" onclick="togglePanel(this)">THREAD DETAILS</div>
             <div class="panel-body">
@@ -85,14 +85,13 @@
             </div>
         </div>
 
-        <!-- ALL THREADS — collapsible, fixed height, scrolls inside -->
+        <!-- ALL THREADS -->
         <div id="thread-panel">
             <div class="panel-title" onclick="togglePanel(this)">All Threads</div>
-            <!-- NO panel-body wrapper — thread-list scrolls directly -->
             <div id="thread-list"></div>
         </div>
 
-        <!-- EXECUTION HISTORY — takes remaining height, scrolls inside -->
+        <!-- EXECUTION HISTORY -->
         <div id="history-panel">
             <div class="panel-title" onclick="togglePanel(this)">
                 Execution History
@@ -101,7 +100,6 @@
                     Clear
                 </button>
             </div>
-            <!-- NO panel-body wrapper — history-list scrolls directly -->
             <div id="history-list"></div>
         </div>
 
@@ -284,13 +282,16 @@
                 const lineInfo = e.line > 0
                     ? `<span class="h-line">line ${e.line}</span>` : '';
 
-                const methodRow = e.method && e.method !== 'unknown' ? `
-                    <div class="h-method-row">
-                        <span class="h-method-label">at</span>
-                        <span class="h-method">${e.method}</span>
-                        ${e.file !== '-' ? `<span class="h-file">${e.file}</span>` : ''}
-                    </div>` : '';
+                // Full method & file — no truncation, entry scrolls horizontally
+                const methodRow = e.method && e.method !== 'unknown'
+                    ? `<div class="h-method-row">
+                           <span class="h-method-label">at</span>
+                           <span class="h-method">${e.method}</span>
+                           ${e.file && e.file !== '-' ? `<span class="h-file">${e.file}</span>` : ''}
+                       </div>`
+                    : '';
 
+                // Full variable values — no truncation
                 const vars = e.variables && e.variables.length > 0
                     ? `<div class="h-vars-row">${
                         e.variables.map(v =>
@@ -299,21 +300,23 @@
                                 <span class="h-var-eq">=</span>
                                 <span class="h-var-val">${v.value}</span>
                                 <span class="h-var-type">(${v.type})</span>
-                            </span>`
+                             </span>`
                         ).join('')
-                    }</div>` : '';
+                    }</div>`
+                    : '';
 
-                return `
-                <div class="history-entry">
-                    <div class="h-main-row">
-                        <span class="h-time">${e.time}</span>
-                        <span class="h-name">${e.name}</span>
-                        <span class="h-arrow">→</span>
-                        <span class="h-state ${e.state}">${e.state.replace('_', ' ')}</span>
-                        ${lineInfo}
+                // h-entry-inner uses min-width:max-content → triggers horizontal scroll on .history-entry
+                return `<div class="history-entry">
+                    <div class="h-entry-inner">
+                        <div class="h-main-row">
+                            <span class="h-time">${e.time}</span>
+                            <span class="h-name">${e.name}</span>
+                            <span class="h-arrow">→</span>
+                            <span class="h-state ${e.state}">${e.state.replace('_', ' ')}</span>
+                            ${lineInfo}
+                        </div>
+                        ${methodRow}${vars}
                     </div>
-                    ${methodRow}
-                    ${vars}
                 </div>`;
             }).join('');
     }

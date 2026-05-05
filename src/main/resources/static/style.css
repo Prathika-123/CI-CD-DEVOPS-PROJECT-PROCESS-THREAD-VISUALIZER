@@ -4,14 +4,10 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: #f0f2f5;
     color: #1a1a2e;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-     height: auto;           /* remove fixed 100vh */
-        min-height: 100vh;
-        overflow-y: auto;       /* enable vertical scroll for page */
-        overflow-x: hidden
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* ── Top Bar ── */
@@ -58,23 +54,13 @@ body {
 /* ── Main layout ── */
 #main-layout {
     display: flex;
-    flex: 1;
-    overflow: visible;
-    position: relative;
-    height: 0;
+    height: calc(100vh - 52px);
+    overflow-x: auto;   /* 🔥 allow horizontal */
+    overflow-y: hidden;
 }
 
-/* ── Canvas area ── */
 #canvas-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    background: #eef1f7;
-    min-width: 400px;
-    overflow: hidden;
+    min-width: 0;       /* 🔥 prevents push-off */
 }
 
 #canvas-label {
@@ -112,15 +98,8 @@ body {
     text-align: center; line-height: 1.2;
     word-break: break-all; padding: 3px; z-index: 2;
 }
-.thread-node:hover {
-    transform: scale(1.18);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-    z-index: 10;
-}
-.thread-node.selected {
-    border: 3px solid #fff;
-    box-shadow: 0 0 0 3px #1a1a2e;
-}
+.thread-node:hover { transform: scale(1.18); box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 10; }
+.thread-node.selected { border: 3px solid #fff; box-shadow: 0 0 0 3px #1a1a2e; }
 .thread-node.RUNNABLE      { background: #1D9E75; }
 .thread-node.BLOCKED       { background: #E24B4A; }
 .thread-node.WAITING       { background: #8B5CF6; }
@@ -140,100 +119,63 @@ body {
 
 /* ── Sidebar resizer ── */
 #sidebar-resizer {
-    width: 5px;
-    cursor: col-resize;
-    background: transparent;
-    border-left: 1px solid #ddd;
-    transition: border-color 0.2s;
-    flex-shrink: 0;
+    width: 5px; cursor: col-resize;
+    background: transparent; border-left: 1px solid #ddd;
+    transition: border-color 0.2s; flex-shrink: 0;
 }
 #sidebar-resizer:hover,
 #sidebar-resizer.dragging { border-color: #8B5CF6; }
 
 /* ── Sidebar ── */
+#sidebar {
+    width: 340px; min-width: 240px; max-width: 600px;
+    display: flex; flex-direction: column;
+    height: 100%;
+    background: #fff; border-left: 1px solid #e8e8e8;
+    overflow: hidden; flex-shrink: 0; box-sizing: border-box;
+    overflow-x: hidden;
+}
 
+/* ── Panels ── */
+#detail-card  { flex: 0 0 auto; border-bottom: 1px solid #eee; overflow: hidden; }
+#thread-panel { flex: 0 0 200px; display: flex; flex-direction: column; border-bottom: 1px solid #eee; overflow: hidden; }
+#thread-list  { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+#history-panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+
+/* History list: vertical scroll only — entries themselves scroll horizontally */
+#history-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
 
 /* ── Panel title ── */
 .panel-title {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: #999;
-    padding: 10px 16px 8px;
-    background: #fafafa;
-    border-bottom: 1px solid #eee;
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-    width: 100%;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: #999; padding: 8px 12px;
+    background: #fafafa; border-bottom: 1px solid #eee;
+    cursor: pointer; user-select: none;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0; width: 100%;
 }
-.panel-title::after {
-    content: '▲';
-    font-size: 10px;
-    color: #bbb;
-    transition: transform 0.2s;
-    margin-left: 6px;
-}
+.panel-title::after { content: '▲'; font-size: 10px; color: #bbb; transition: transform 0.2s; margin-left: 6px; }
 .panel-title.collapsed::after { transform: rotate(180deg); }
 
-/* panel-body only used for detail-card now */
-.panel-body {
-    overflow: hidden;
-    transition: max-height 0.25s ease;
-    max-height: 2000px;
-}
-.panel-body.collapsed { max-height: 0; }
+.panel-body { overflow: hidden; transition: max-height 0.25s ease; max-height: 2000px; padding: 8px 12px; }
+.panel-body.collapsed { max-height: 0; padding: 0 12px; }
 
-/* ── Detail card — shrinks to content ── */
-#detail-card {
-    flex-shrink: 0;
-    border-bottom: 1px solid #eee;
-    overflow: hidden;
-}
-#detail-card .panel-title {
-    background: #f5f7ff;
-    color: #555;
-    border-bottom: 1px solid #e8eeff;
-}
-#detail-card .panel-body {
-    padding: 12px 16px;
-    background: #fff;
-    overflow: hidden;
-}
-#detail-header {
-    font-size: 12px; color: #bbb;
-    font-style: italic; text-align: center;
-    padding: 8px 0;
-}
-.detail-name {
-    font-size: 15px; font-weight: 700;
-    margin-bottom: 10px; color: #1a1a2e;
-    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-}
-.detail-row {
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 11px; padding: 5px 0;
-    border-bottom: 1px solid #f5f5f5; color: #555;
-    overflow: hidden;
-}
+/* ── Detail card ── */
+#detail-header { font-size: 12px; color: #bbb; font-style: italic; text-align: center; padding: 4px 0; }
+.detail-name { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #1a1a2e; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.detail-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 0; border-bottom: 1px solid #f5f5f5; color: #555; overflow: hidden; }
 .detail-row:last-child { border-bottom: none; }
 .detail-row .label { color: #aaa; flex-shrink: 0; margin-right: 8px; }
-.detail-row .value {
-    font-family: monospace; font-size: 11px;
-    max-width: 200px; overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap;
-    color: #333; text-align: right;
-}
+.detail-row .value { font-family: monospace; font-size: 11px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; text-align: right; }
 
 /* ── Badges ── */
-.badge {
-    display: inline-block; font-size: 10px; font-weight: 700;
-    padding: 2px 8px; border-radius: 10px; color: #fff;
-}
+.badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; color: #fff; }
 .badge.RUNNABLE      { background: #1D9E75; }
 .badge.BLOCKED       { background: #E24B4A; }
 .badge.WAITING       { background: #8B5CF6; }
@@ -241,168 +183,96 @@ body {
 .badge.TERMINATED    { background: #888780; }
 .badge.NEW           { background: #EF9F27; }
 
-/* ── Thread panel — fixed height, thread-list scrolls directly ── */
-#thread-panel {
-    flex-shrink: 0;
-    border-bottom: 1px solid #eee;
-    display: flex;
-    flex-direction: column;
-    height: 200px;             /* fixed — never grows */
-    overflow: hidden;
-}
-
-/* thread-list is a direct child of thread-panel, no panel-body in between */
-#thread-list {
-    flex: 1;
-    overflow-y: scroll;
-    overflow-x: hidden;
-    min-height: 0;
-}
-
-.thread-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 16px; border-bottom: 1px solid #f5f5f5;
-    cursor: pointer; font-size: 12px; transition: background 0.1s;
-    overflow: hidden;
-    width: 100%;
-}
-.thread-row:hover    { background: #f0f7ff; }
+/* ── Thread rows ── */
+.thread-row { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #f5f5f5; cursor: pointer; font-size: 12px; transition: background 0.1s; overflow: hidden; width: 100%; }
+.thread-row:hover { background: #f0f7ff; }
 .thread-row.selected { background: #e8f3ff; }
-.tname {
-    flex: 1; font-weight: 500; overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap;
-    color: #1a1a2e; min-width: 0;
-}
-.tmethod {
-    font-size: 10px; color: #bbb; font-family: monospace;
-    overflow: hidden; text-overflow: ellipsis;
-    white-space: nowrap; max-width: 120px; flex-shrink: 0;
-}
+.tname { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1a1a2e; min-width: 0; }
+.tmethod { font-size: 10px; color: #bbb; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; flex-shrink: 0; }
 
-/* ── History panel — takes ALL remaining height ── */
-#history-panel {
-    flex: 1;             /* take all remaining sidebar height */
-    display: flex;
-    flex-direction: column;
-    min-height: 0;       /* important for flex overflow to work */
+/* ═══════════════════════════════════════════════════════════
+   HISTORY ENTRIES
+   • Outer entry: fixed rows for main + method, no wrap
+   • vars row: horizontally scrollable
+   ═══════════════════════════════════════════════════════════ */
+.history-entry {
+    padding: 2px 0;
+    border-bottom: 1px solid #f2f2f2;
+    overflow-x: auto;
+    overflow-y: hidden;
+    line-height: 1.2;            /* tighter vertical spacing */
 }
 
-#history-list {
-    flex: 1;                  /* fill available vertical space */
-    min-height: 0;            /* allow flexbox to shrink */
-    overflow-y: auto;         /* vertical scroll */
-    overflow-x: hidden;       /* no horizontal scroll */
-    word-break: break-word;   /* wrap long words */
-    padding-right: 6px;       /* leave space for scrollbar */
-    box-sizing: border-box;
+.history-entry:last-child { border-bottom: none; }
+.history-entry:hover { background: #fafbff; }
+.history-entry::-webkit-scrollbar { height: 3px; }
+.history-entry::-webkit-scrollbar-track { background: transparent; }
+.history-entry::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 2px; }
+.history-entry:hover::-webkit-scrollbar-thumb { background: #c0c8e0; }
+
+/* Inner wrapper — min-width: max-content makes it expand and trigger scroll */
+.h-entry-inner {
+    display: inline-block;
+    min-width: max-content;
+    padding: 0 10px;             /* slightly tighter */
 }
 
-/* ── History entries — stacked vertically ── */
-
-.history-entry:hover { background: #fafafa; }
-
+/* Line 1: time · name → STATE  line N */
 .h-main-row {
-    display: flex;
+    display: inline-flex;     /* prevents stretching */
     align-items: center;
-    gap: 5px;
-    flex-wrap: wrap;
-    width: 100%;
+    gap: 2px;                 /* tighter spacing */
+    white-space: nowrap;
+    height: 16px;
 }
-.h-time { color: #ccc; flex-shrink: 0; font-family: monospace; font-size: 9px; }
-.h-name  { color: #185FA5; font-weight: 600; flex-shrink: 0; }
-.h-arrow { color: #ddd; flex-shrink: 0; }
-.h-state { font-weight: 700; font-size: 10px; flex-shrink: 0; }
+
+.h-time  { margin-right: 6px; }
+.h-name  { margin-right: 2px; }
+.h-arrow { margin: 0 2px; }
+.h-state { margin-left: 2px; }
 .h-state.RUNNABLE      { color: #1D9E75; }
 .h-state.BLOCKED       { color: #E24B4A; }
 .h-state.WAITING       { color: #8B5CF6; }
 .h-state.TIMED_WAITING { color: #378ADD; }
 .h-state.TERMINATED    { color: #888; }
-.h-line {
-    font-size: 9px; background: #f0f4ff;
-    color: #378ADD; padding: 1px 6px;
-    border-radius: 4px; font-family: monospace;
-    font-weight: 600; flex-shrink: 0;
-}
+.h-line  { margin-left: 4px; }
+
+/* Line 2: at method()  file.java */
 .h-method-row {
-    display: flex; align-items: center; gap: 4px;
-    margin-top: 3px; font-family: monospace; font-size: 9px;
-    width: 100%; overflow: hidden;
+    margin-top: 0px;
+    height: 13px;
 }
-.h-method-label { color: #ddd; flex-shrink: 0; }
-.h-method {
-    color: #888; flex: 1; min-width: 0;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.h-file {
-    color: #bbb; font-style: italic; flex-shrink: 0;
-    overflow: hidden; text-overflow: ellipsis;
-    white-space: nowrap; max-width: 90px;
-}
+
+.h-method-label { color: #e0e0e0; flex-shrink: 0; }
+.h-method { color: #bbb; flex-shrink: 0; }
+.h-file   { color: #d0d0d0; font-style: italic; flex-shrink: 0; }
+
+/* Line 3: variable chips — single line, no wrap, scrolls with entry */
 .h-vars-row {
-    display: flex; flex-wrap: wrap; gap: 4px;
-    margin-top: 5px; width: 100%; overflow: hidden;
+    margin-top: 1px;
+    height: 16px;
 }
 .h-var {
     display: inline-flex; align-items: center; gap: 2px;
-    background: #fdfdf5; border: 0.5px solid #e8e8c8;
-    border-radius: 4px; padding: 2px 7px;
+    background: #fdfdf5; border: 0.5px solid #eaeac8;
+    border-radius: 3px; padding: 1px 6px;
     font-family: monospace; font-size: 9px;
-    max-width: 100%; overflow: hidden;
+    flex-shrink: 0;   /* never compress — let parent scroll */
 }
-.h-var-name { color: #856404; font-weight: 600; flex-shrink: 0; }
-.h-var-eq   { color: #bbb; flex-shrink: 0; }
-.h-var-val  {
-    color: #1D9E75; font-weight: 700;
-    overflow: hidden; text-overflow: ellipsis;
-    white-space: nowrap; max-width: 130px;
-}
-.h-var-type { color: #ccc; font-style: italic; flex-shrink: 0; }
+.h-var-name { color: #856404; font-weight: 600; }
+.h-var-eq   { color: #ccc; }
+.h-var-val  { color: #1D9E75; font-weight: 700; }
+.h-var-type { color: #ccc; font-style: italic; }
 
-/* ── Scrollbars — both panels ── */
+/* ── Scrollbars (vertical — history & thread list) ── */
 #history-list::-webkit-scrollbar,
-#thread-list::-webkit-scrollbar  { width: 6px; }
+#thread-list::-webkit-scrollbar  { width: 5px; }
 #history-list::-webkit-scrollbar-track,
 #thread-list::-webkit-scrollbar-track { background: #f5f5f5; border-radius: 3px; }
 #history-list::-webkit-scrollbar-thumb,
-#thread-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; min-height: 40px; }
+#thread-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; min-height: 30px; }
 #history-list::-webkit-scrollbar-thumb:hover,
 #thread-list::-webkit-scrollbar-thumb:hover { background: #8B5CF6; }
 
 /* ── Speed control ── */
 #speed-control { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #aaa; }
-
-
-/* Make the sidebar scroll vertically if content overflows */
-/* ── Sidebar scrolls vertically ── */
-#sidebar {
-    width: 340px;
-    min-width: 240px;
-    max-width: 600px;
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 52px); /* full viewport minus top bar */
-    background: #fff;
-    border-left: 1px solid #e8e8e8;
-    overflow-y: auto;           /* vertical scroll for entire sidebar */
-    overflow-x: hidden;         /* prevent horizontal scroll */
-    flex-shrink: 0;
-    box-sizing: border-box;
-}
-
-/* Let all panels inside sidebar flow naturally */
-#detail-card, #thread-panel, #history-panel {
-    flex: none;                 /* do not force height */
-}
-
-/* Optional: add some padding at the bottom */
-#sidebar > div:last-child {
-    margin-bottom: 10px;
-}
-
-/* Prevent horizontal scroll inside history entries */
-.history-entry {
-    width: 100%;
-    overflow-wrap: break-word;  /* wrap long text */
-    white-space: pre-wrap;      /* wrap long lines */
-    box-sizing: border-box;
-}
