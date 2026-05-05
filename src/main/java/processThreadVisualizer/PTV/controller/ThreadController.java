@@ -36,9 +36,9 @@ public class ThreadController {
 
     @PostConstruct
     public void init() {
-       
+       boolean ok = false;
  try {
-         boolean ok = jdiService.connect(jdiHost, jdiPort);
+        ok = jdiService.connect(jdiHost, jdiPort);
     } catch (Exception e) {
         System.out.println("⚠️ Skipping JDI connection (not available in container)");
     }
