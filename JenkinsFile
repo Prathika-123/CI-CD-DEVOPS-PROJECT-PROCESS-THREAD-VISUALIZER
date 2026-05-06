@@ -51,7 +51,7 @@ pipeline {
                 docker stop $CONTAINER_NAME || true
                 docker rm $CONTAINER_NAME || true
 
-                docker run \
+                docker run -d \
                 -p $PORT:8081 \
                 --name $CONTAINER_NAME \
                 $IMAGE_NAME:latest
