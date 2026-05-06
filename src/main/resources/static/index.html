@@ -3,408 +3,943 @@
 <head>
     <meta charset="UTF-8">
     <title>Java Thread Visualizer</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        :root {
+          --bg: #f1f5f9;
+          --bg2: #ffffff;
+          --bg3: #f8fafc;
+          --border: rgba(0,0,0,0.08);
+          --border-hi: rgba(59,130,246,0.35);
+          --accent: #2563eb;
+          --accent-glow: rgba(37,99,235,0.15);
+          --green: #059669;
+          --green-glow: rgba(5,150,105,0.15);
+          --red: #dc2626;
+          --red-glow: rgba(220,38,38,0.15);
+          --purple: #7c3aed;
+          --purple-glow: rgba(124,58,237,0.15);
+          --amber: #d97706;
+          --gray: #9ca3af;
+          --text: #0f172a;
+          --text-dim: #475569;
+          --text-muted: #94a3b8;
+          --font-mono: 'JetBrains Mono', monospace;
+          --font-ui: 'Syne', sans-serif;
+          --radius: 10px;
+          --topbar: 56px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+          height: 100%;
+          background: var(--bg);
+          color: var(--text);
+          font-family: var(--font-ui);
+          overflow: hidden;
+        }
+
+        /* ═══════════════════════════ TOP BAR ═══════════════════════════ */
+        #topbar {
+          height: var(--topbar);
+          background: var(--bg2);
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          padding: 0 20px;
+          gap: 16px;
+          flex-shrink: 0;
+          position: relative;
+          z-index: 10;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        #topbar::after {
+          content: '';
+          position: absolute;
+          bottom: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, var(--accent), transparent);
+          opacity: 0.4;
+        }
+
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-right: 8px;
+        }
+
+        .brand-icon {
+          width: 32px; height: 32px;
+          background: var(--accent);
+          border-radius: 8px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 16px;
+          box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        .brand-name {
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: 0.5px;
+          color: var(--text);
+        }
+
+        .brand-sub {
+          font-size: 11px;
+          font-weight: 400;
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+        }
+
+        .divider { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
+
+        /* Status */
+        #status-pill {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 5px 12px;
+          background: var(--bg3);
+          border: 1px solid var(--border);
+          border-radius: 20px;
+          font-size: 11px;
+          font-family: var(--font-mono);
+          color: var(--text-dim);
+          white-space: nowrap;
+        }
+
+        .status-dot {
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          background: var(--gray);
+          transition: background 0.4s, box-shadow 0.4s;
+        }
+        .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .status-dot.disconnected { background: var(--red); box-shadow: 0 0 8px var(--red); }
+        .status-dot.paused { background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: pulse 1.2s ease-in-out infinite; }
+
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+        /* Buttons */
+        .btn {
+          display: flex; align-items: center; gap: 6px;
+          padding: 6px 14px;
+          font-size: 11px; font-weight: 600;
+          font-family: var(--font-ui);
+          border-radius: 6px;
+          cursor: pointer;
+          border: 1px solid;
+          transition: all 0.15s;
+          white-space: nowrap;
+          letter-spacing: 0.3px;
+        }
+        .btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+
+        .btn-ghost-blue  { color: var(--accent);  border-color: rgba(59,130,246,0.4);  background: rgba(59,130,246,0.06); }
+        .btn-ghost-amber { color: var(--amber);   border-color: rgba(245,158,11,0.4);  background: rgba(245,158,11,0.06); }
+        .btn-ghost-green { color: var(--green);   border-color: rgba(16,185,129,0.4);  background: rgba(16,185,129,0.06); }
+        .btn-ghost-purple{ color: var(--purple);  border-color: rgba(139,92,246,0.4);  background: rgba(139,92,246,0.06); }
+
+        /* Stats */
+        .stats-group { display: flex; gap: 4px; margin-left: auto; }
+        .stat-chip {
+          display: flex; align-items: center; gap: 6px;
+          padding: 5px 12px;
+          background: var(--bg3);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          font-size: 11px; font-family: var(--font-mono);
+        }
+        .stat-chip .num { font-size: 16px; font-weight: 700; line-height: 1; }
+        .stat-chip .lbl { color: var(--text-dim); font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; }
+        .stat-chip.s-run  .num { color: var(--green); }
+        .stat-chip.s-blk  .num { color: var(--red); }
+        .stat-chip.s-wait .num { color: var(--purple); }
+        .stat-chip.s-all  .num { color: var(--accent); }
+
+        /* Speed */
+        .speed-ctrl { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); }
+        .speed-ctrl input[type=range] { accent-color: var(--purple); width: 90px; cursor: pointer; }
+        .speed-val { color: var(--purple); min-width: 42px; font-weight: 600; }
+
+        /* ═══════════════════════════ LAYOUT ═══════════════════════════ */
+        #layout {
+          display: flex;
+          height: calc(100vh - var(--topbar));
+          overflow: hidden;
+        }
+
+        #canvas-wrap { flex: 1 1 0; min-width: 0; }
+
+        /* ═══════════════════════════ CANVAS ═══════════════════════════ */
+        #canvas-wrap {
+          position: relative;
+          overflow: hidden;
+          background:
+            radial-gradient(ellipse at 30% 40%, rgba(37,99,235,0.04) 0%, transparent 60%),
+            radial-gradient(ellipse at 70% 70%, rgba(124,58,237,0.03) 0%, transparent 55%),
+            var(--bg);
+        }
+
+        /* Subtle grid */
+        #canvas-wrap::before {
+          content: '';
+          position: absolute; inset: 0;
+          background-image:
+            linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+          background-size: 48px 48px;
+          pointer-events: none;
+        }
+
+        #svg-canvas {
+          position: absolute; inset: 0;
+          width: 100%; height: 100%;
+          pointer-events: none;
+          overflow: visible;
+        }
+
+        /* Thread nodes on canvas */
+        .t-node {
+          position: absolute;
+          transform: translate(-50%, -50%);
+          cursor: pointer;
+          transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+        }
+
+        .t-node:hover { transform: translate(-50%,-50%) scale(1.12); }
+        .t-node:hover .t-ring { opacity: 1; transform: scale(1.05); }
+        .t-node.selected .t-ring { opacity: 1; }
+
+        .t-ring {
+          position: absolute;
+          inset: -8px;
+          border-radius: 50%;
+          border: 2px solid;
+          opacity: 0;
+          transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .t-circle {
+          width: 68px; height: 68px;
+          border-radius: 50%;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 2px;
+          border: 2px solid rgba(255,255,255,0.4);
+          box-shadow: 0 4px 16px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25);
+          position: relative;
+          z-index: 1;
+        }
+
+        .t-icon { font-size: 16px; line-height: 1; filter: brightness(0) invert(1); }
+        .t-label {
+          font-size: 8px; font-weight: 700;
+          font-family: var(--font-mono);
+          color: rgba(255,255,255,0.95);
+          text-align: center;
+          max-width: 60px;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          letter-spacing: 0.3px;
+          text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        /* State colors */
+        .t-node.RUNNABLE      .t-circle { background: linear-gradient(135deg, #059669, #047857); border-color: rgba(255,255,255,0.3); }
+        .t-node.RUNNABLE      .t-ring   { border-color: var(--green); }
+        .t-node.BLOCKED       .t-circle { background: linear-gradient(135deg, #dc2626, #b91c1c); border-color: rgba(255,255,255,0.3); }
+        .t-node.BLOCKED       .t-ring   { border-color: var(--red); }
+        .t-node.WAITING       .t-circle { background: linear-gradient(135deg, #7c3aed, #6d28d9); border-color: rgba(255,255,255,0.3); }
+        .t-node.WAITING       .t-ring   { border-color: var(--purple); }
+        .t-node.TIMED_WAITING .t-circle { background: linear-gradient(135deg, #2563eb, #1d4ed8); border-color: rgba(255,255,255,0.3); }
+        .t-node.TIMED_WAITING .t-ring   { border-color: var(--accent); }
+        .t-node.TERMINATED    .t-circle { background: linear-gradient(135deg, #6b7280, #4b5563); border-color: rgba(255,255,255,0.3); }
+        .t-node.TERMINATED    .t-ring   { border-color: var(--gray); }
+        .t-node.NEW           .t-circle { background: linear-gradient(135deg, #d97706, #b45309); border-color: rgba(255,255,255,0.3); }
+        .t-node.NEW           .t-ring   { border-color: var(--amber); }
+
+        .t-node.selected .t-circle {
+          box-shadow: 0 0 0 3px rgba(255,255,255,0.5), 0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+
+        /* JVM center */
+        #jvm-center {
+          position: absolute;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: 100px; height: 100px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 40% 35%, #ffffff, #f1f5f9);
+          border: 1px solid var(--border-hi);
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 2px;
+          box-shadow: 0 0 32px rgba(37,99,235,0.10), 0 4px 16px rgba(0,0,0,0.08);
+          pointer-events: none; z-index: 0;
+        }
+
+        #jvm-center .j-icon { font-size: 28px; }
+        #jvm-center .j-label { font-size: 9px; font-family: var(--font-mono); color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+
+        /* Legend */
+        #legend {
+          position: absolute;
+          bottom: 20px; left: 50%;
+          transform: translateX(-50%);
+          display: flex; gap: 18px;
+          background: rgba(255,255,255,0.85);
+          backdrop-filter: blur(10px);
+          padding: 8px 20px;
+          border-radius: 20px;
+          border: 1px solid var(--border);
+          box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+        }
+
+        .leg-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); }
+        .leg-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .leg-dot.RUNNABLE      { background: var(--green); }
+        .leg-dot.BLOCKED       { background: var(--red); }
+        .leg-dot.TIMED_WAITING { background: var(--accent); }
+        .leg-dot.WAITING       { background: var(--purple); }
+        .leg-dot.TERMINATED    { background: var(--gray); }
+
+        /* Canvas label */
+        #canvas-label {
+          position: absolute;
+          top: 18px; left: 22px;
+          font-size: 10px; font-weight: 600;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+        }
+
+        /* ═══════════════════════════ SIDEBAR ═══════════════════════════ */
+        #sidebar-resizer {
+          width: 5px;
+          cursor: col-resize;
+          background: transparent;
+          border-left: 1px solid var(--border);
+          transition: border-color 0.2s, background 0.2s;
+          flex-shrink: 0;
+          position: relative;
+          z-index: 5;
+        }
+        #sidebar-resizer:hover,
+        #sidebar-resizer.dragging {
+          border-color: var(--accent);
+          background: rgba(59,130,246,0.08);
+        }
+
+        #sidebar {
+          width: 320px;
+          min-width: 220px;
+          max-width: 640px;
+          background: var(--bg2);
+          border-left: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          overflow-y: auto;
+          overflow-x: hidden;
+          height: 100%;
+          flex-shrink: 0;
+        }
+
+        /* Section header */
+        .sec-head {
+          padding: 12px 16px 10px;
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+          border-bottom: 1px solid var(--border);
+          background: var(--bg3);
+          display: flex; align-items: center; justify-content: space-between;
+          cursor: pointer; user-select: none; flex-shrink: 0;
+          position: sticky; top: 0; z-index: 2;
+        }
+        .sec-head svg { transition: transform 0.2s; color: var(--text-muted); }
+        .sec-head.collapsed svg { transform: rotate(-90deg); }
+
+        .sec-body { overflow: hidden; transition: max-height 0.25s ease; }
+        .sec-body.collapsed { max-height: 0 !important; }
+
+        /* ── Detail ── */
+        #detail-sec .sec-body { overflow: visible; }
+
+        #detail-empty {
+          padding: 24px 16px;
+          text-align: center;
+          color: var(--text-muted);
+          font-size: 12px;
+          font-family: var(--font-mono);
+        }
+
+        #detail-content { padding: 14px 16px; }
+
+        .d-name {
+          font-size: 14px; font-weight: 700;
+          margin-bottom: 12px;
+          display: flex; align-items: center; gap: 8px;
+          color: var(--text);
+        }
+
+        .d-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 6px 0;
+          border-bottom: 1px solid var(--border);
+          font-size: 11px;
+        }
+        .d-row:last-child { border-bottom: none; }
+        .d-key { color: var(--text-muted); font-family: var(--font-mono); }
+        .d-val { color: var(--text-dim); font-family: var(--font-mono); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+
+        /* ── Thread list ── */
+        #thread-sec { flex: 0 0 auto; }
+        #thread-sec .sec-body { overflow: visible; }
+
+        .t-row {
+          display: flex; align-items: center; gap: 10px;
+          padding: 8px 16px;
+          border-bottom: 1px solid var(--border);
+          cursor: pointer;
+          transition: background 0.1s;
+          font-size: 12px;
+        }
+        .t-row:hover { background: #f1f5f9; }
+        .t-row.selected { background: rgba(37,99,235,0.06); border-left: 2px solid var(--accent); padding-left: 14px; }
+
+        .t-row-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 12px; }
+        .t-row-method { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; flex-shrink: 0; }
+
+        /* ── History ── */
+        #history-sec { flex: 0 0 auto; }
+        #history-sec .sec-body { overflow: visible; }
+
+        .h-entry {
+          padding: 8px 16px;
+          border-bottom: 1px solid var(--border);
+          overflow-x: auto;
+          overflow-y: hidden;
+        }
+        .h-entry:hover { background: #f8fafc; }
+        .h-entry::-webkit-scrollbar { height: 2px; }
+        .h-entry::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 2px; }
+
+        .h-inner { display: inline-block; min-width: max-content; }
+
+        .h-main {
+          display: flex; align-items: center;
+          gap: 6px; white-space: nowrap;
+          font-size: 11px; font-family: var(--font-mono);
+          line-height: 1.4;
+        }
+
+        .h-time { color: var(--text-muted); }
+        .h-tname { color: var(--text-dim); font-weight: 600; }
+        .h-arrow { color: var(--text-muted); }
+        .h-state { font-weight: 700; }
+        .h-state.RUNNABLE      { color: var(--green); }
+        .h-state.BLOCKED       { color: var(--red); }
+        .h-state.WAITING       { color: var(--purple); }
+        .h-state.TIMED_WAITING { color: var(--accent); }
+        .h-state.TERMINATED    { color: var(--gray); }
+        .h-line { color: var(--text-muted); }
+
+        .h-method {
+          margin-top: 2px;
+          font-size: 10px;
+          font-family: var(--font-mono);
+          color: var(--text-muted);
+          white-space: nowrap;
+        }
+        .h-method .at { color: var(--text-muted); opacity: 0.5; margin-right: 3px; }
+        .h-method .fn { color: #475569; }
+        .h-method .fi { color: #334155; font-style: italic; margin-left: 4px; }
+
+        .h-vars {
+          margin-top: 3px;
+          display: flex; gap: 5px; flex-wrap: nowrap;
+          white-space: nowrap;
+        }
+        .h-var {
+          display: inline-flex; align-items: center; gap: 3px;
+          background: rgba(217,119,6,0.06);
+          border: 1px solid rgba(217,119,6,0.18);
+          border-radius: 4px;
+          padding: 1px 7px;
+          font-family: var(--font-mono); font-size: 9px;
+        }
+        .h-vn { color: #ca8a04; font-weight: 700; }
+        .h-ve { color: var(--text-muted); }
+        .h-vv { color: var(--green); font-weight: 700; }
+        .h-vt { color: var(--text-muted); font-style: italic; }
+
+        /* Badges */
+        .badge {
+          font-size: 9px; font-weight: 700;
+          font-family: var(--font-mono);
+          padding: 2px 8px; border-radius: 4px;
+          letter-spacing: 0.5px; white-space: nowrap;
+        }
+        .badge.RUNNABLE      { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+        .badge.BLOCKED       { background: rgba(239,68,68,0.15);  color: var(--red);   border: 1px solid rgba(239,68,68,0.3); }
+        .badge.WAITING       { background: rgba(139,92,246,0.15); color: var(--purple);border: 1px solid rgba(139,92,246,0.3); }
+        .badge.TIMED_WAITING { background: rgba(59,130,246,0.15); color: var(--accent);border: 1px solid rgba(59,130,246,0.3); }
+        .badge.TERMINATED    { background: rgba(107,114,128,0.15);color: var(--gray);  border: 1px solid rgba(107,114,128,0.3); }
+        .badge.NEW           { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        /* Clear btn */
+        .clear-btn {
+          font-size: 9px; padding: 2px 8px;
+          background: transparent;
+          color: var(--text-muted);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 4px; cursor: pointer;
+          font-family: var(--font-mono);
+          transition: all 0.15s;
+        }
+        .clear-btn:hover { color: var(--red); border-color: rgba(239,68,68,0.4); }
+
+        /* SVG lines */
+        .thread-line {
+          stroke: rgba(37,99,235,0.15);
+          stroke-width: 1;
+          fill: none;
+          stroke-dasharray: 4 4;
+        }
+    </style>
 </head>
 <body>
 
-<div id="top-bar">
-    <div id="title-area">
-        <span id="logo">&#11041;</span>
-        <span id="app-title">Java Thread Visualizer</span>
+<!-- ═══════════ TOP BAR ═══════════ -->
+<div id="topbar">
+    <div class="brand">
+        <div class="brand-icon">☕</div>
+        <div>
+            <div class="brand-name">Thread Visualizer</div>
+            <div class="brand-sub">JVM runtime inspector</div>
+        </div>
     </div>
-    <div id="status-bar">
-        <div id="status-dot"></div>
+
+    <div class="divider"></div>
+
+    <div id="status-pill">
+        <div class="status-dot" id="status-dot"></div>
         <span id="status-text">Connecting...</span>
-        <button id="reconnect-btn" onclick="reconnect()">Reconnect JVM</button>
     </div>
-    <button onclick="suspendJVM()"
-            style="font-size:11px;padding:4px 10px;background:transparent;
-                   color:#EF9F27;border:1px solid #EF9F27;border-radius:4px;
-                   cursor:pointer;white-space:nowrap">
-        ⏸ Pause JVM
-    </button>
-    <button onclick="resumeJVM()"
-            style="font-size:11px;padding:4px 10px;background:transparent;
-                   color:#1D9E75;border:1px solid #1D9E75;border-radius:4px;
-                   cursor:pointer;white-space:nowrap">
-        ▶ Resume JVM
-    </button>
-    <button onclick="stepJVM()"
-            style="font-size:11px;padding:4px 10px;background:transparent;
-               color:#8B5CF6;border:1px solid #8B5CF6;border-radius:4px;
-               cursor:pointer;white-space:nowrap">
-        ⏭ Step
-    </button>
-    <div id="speed-control">
-        <span style="font-size:11px;color:#aaa">Speed</span>
-        <span style="font-size:10px;color:#aaa">Fast</span>
-        <input type="range" id="speed-slider"
-               min="0" max="2000" step="100" value="500"
-               style="width:100px;accent-color:#8B5CF6;cursor:pointer"
-               oninput="updateSpeed(this.value)">
-        <span style="font-size:10px;color:#aaa">Slow</span>
-        <span id="speed-label" style="font-size:11px;color:#8B5CF6;min-width:45px">500ms</span>
+
+    <button class="btn btn-ghost-blue" onclick="reconnect()">⟳ Reconnect JVM</button>
+    <button class="btn btn-ghost-amber" onclick="suspendJVM()">⏸ Pause</button>
+    <button class="btn btn-ghost-green" onclick="resumeJVM()">▶ Resume</button>
+    <button class="btn btn-ghost-purple" onclick="stepJVM()">⏭ Step</button>
+
+    <div class="speed-ctrl">
+        <span>Speed</span>
+        <span style="font-size:9px">Fast</span>
+        <input type="range" id="speed-slider" min="0" max="2000" step="100" value="500" oninput="updateSpeed(this.value)">
+        <span style="font-size:9px">Slow</span>
+        <span class="speed-val" id="speed-label">500ms</span>
     </div>
-    <div id="stats-bar">
-        <span class="stat"><span id="total-count">0</span> threads</span>
-        <span class="stat run-stat"><span id="run-count">0</span> running</span>
-        <span class="stat block-stat"><span id="block-count">0</span> blocked</span>
-        <span class="stat wait-stat"><span id="wait-count">0</span> waiting</span>
+
+    <div class="stats-group">
+        <div class="stat-chip s-all">
+            <div>
+                <div class="num" id="total-count">0</div>
+                <div class="lbl">Total</div>
+            </div>
+        </div>
+        <div class="stat-chip s-run">
+            <div>
+                <div class="num" id="run-count">0</div>
+                <div class="lbl">Running</div>
+            </div>
+        </div>
+        <div class="stat-chip s-blk">
+            <div>
+                <div class="num" id="block-count">0</div>
+                <div class="lbl">Blocked</div>
+            </div>
+        </div>
+        <div class="stat-chip s-wait">
+            <div>
+                <div class="num" id="wait-count">0</div>
+                <div class="lbl">Waiting</div>
+            </div>
+        </div>
     </div>
 </div>
 
-<div id="main-layout">
+<!-- ═══════════ MAIN LAYOUT ═══════════ -->
+<div id="layout">
 
-    <div id="canvas-area">
+    <!-- Canvas -->
+    <div id="canvas-wrap">
         <div id="canvas-label">JVM Process</div>
-        <div id="process-circle">
-            <div id="process-label">JVM<br>Process</div>
-            <div id="thread-nodes"></div>
+
+        <svg id="svg-canvas"><g id="svg-lines"></g></svg>
+
+        <div id="jvm-center">
+            <div class="j-icon">⚙</div>
+            <div class="j-label">JVM</div>
         </div>
+
+        <div id="thread-nodes-canvas"></div>
+
         <div id="legend">
-            <span class="legend-item"><span class="ldot RUNNABLE"></span>Runnable</span>
-            <span class="legend-item"><span class="ldot BLOCKED"></span>Blocked</span>
-            <span class="legend-item"><span class="ldot TIMED_WAITING"></span>Timed waiting</span>
-            <span class="legend-item"><span class="ldot WAITING"></span>Waiting</span>
-            <span class="legend-item"><span class="ldot TERMINATED"></span>Terminated</span>
+            <div class="leg-item"><div class="leg-dot RUNNABLE"></div>Runnable</div>
+            <div class="leg-item"><div class="leg-dot BLOCKED"></div>Blocked</div>
+            <div class="leg-item"><div class="leg-dot TIMED_WAITING"></div>Timed Wait</div>
+            <div class="leg-item"><div class="leg-dot WAITING"></div>Waiting</div>
+            <div class="leg-item"><div class="leg-dot TERMINATED"></div>Terminated</div>
         </div>
     </div>
 
+    <!-- Resizer -->
     <div id="sidebar-resizer"></div>
 
+    <!-- Sidebar -->
     <div id="sidebar">
 
-        <!-- THREAD DETAILS -->
-        <div id="detail-card">
-            <div class="panel-title" onclick="togglePanel(this)">THREAD DETAILS</div>
-            <div class="panel-body">
-                <div id="detail-header">Click a thread node to inspect</div>
-                <div id="detail-body"></div>
+        <!-- Thread Details -->
+        <div id="detail-sec">
+            <div class="sec-head" onclick="toggleSec(this)">
+                Thread Details
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 2L9 7H1L5 2Z"/></svg>
+            </div>
+            <div class="sec-body">
+                <div id="detail-empty">Click a thread node to inspect</div>
+                <div id="detail-content" style="display:none"></div>
             </div>
         </div>
 
-        <!-- ALL THREADS -->
-        <div id="thread-panel">
-            <div class="panel-title" onclick="togglePanel(this)">All Threads</div>
-            <div id="thread-list"></div>
+        <!-- All Threads -->
+        <div id="thread-sec">
+            <div class="sec-head" onclick="toggleSec(this)">
+                All Threads
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 2L9 7H1L5 2Z"/></svg>
+            </div>
+            <div class="sec-body">
+                <div id="thread-list"></div>
+            </div>
         </div>
 
-        <!-- EXECUTION HISTORY -->
-        <div id="history-panel">
-            <div class="panel-title" onclick="togglePanel(this)">
+        <!-- Execution History -->
+        <div id="history-sec">
+            <div class="sec-head" onclick="toggleSec(this)">
                 Execution History
-                <button onclick="event.stopPropagation(); clearHistory()"
-                        style="font-size:10px;padding:2px 8px;cursor:pointer;margin-left:auto">
-                    Clear
-                </button>
+                <button class="clear-btn" onclick="event.stopPropagation();clearHistory()">Clear</button>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 2L9 7H1L5 2Z"/></svg>
             </div>
-            <div id="history-list"></div>
+            <div class="sec-body">
+                <div id="history-list"></div>
+            </div>
         </div>
 
     </div>
 </div>
 
 <script>
+    // ══════════════════════ STATE ══════════════════════
+    let selectedId = null;
+    let historyLog = [];
+    let prevStates = {};
+    let prevLines  = {};
+
+    // ══════════════════════ CONNECTION ══════════════════════
     function pollREST() {
-        setInterval(() => {
-            fetch('/api/threads')
-                .then(r => r.json())
-                .then(threads => renderAll(threads))
-                .catch(e => console.error('Poll error:', e));
-        }, 1000);
-        document.getElementById('status-dot').className = 'connected';
-        document.getElementById('status-text').textContent = 'Connected (polling)';
+      setInterval(() => {
+        fetch('/api/threads')
+          .then(r => r.json())
+          .then(threads => renderAll(threads))
+          .catch(e => console.warn('Poll error:', e));
+      }, 1000);
+      setStatus('connected', 'Connected (polling)');
     }
 
     function connect() {
-        try {
-            const socket = new SockJS('/ws');
-            const stomp = Stomp.over(socket);
-            stomp.debug = null;
-            stomp.connect({}, () => {
-                setStatus(true);
-                stomp.subscribe('/topic/threads', msg => {
-                    renderAll(JSON.parse(msg.body));
-                });
-            }, err => {
-                console.warn('STOMP failed, falling back to REST polling');
-                pollREST();
-            });
-        } catch(e) {
-            console.warn('WebSocket unavailable, using REST polling');
-            pollREST();
-        }
+      try {
+        const socket = new SockJS('/ws');
+        const stomp = Stomp.over(socket);
+        stomp.debug = null;
+        stomp.connect({}, () => {
+          setStatus('connected', 'Connected to JVM');
+          stomp.subscribe('/topic/threads', msg => renderAll(JSON.parse(msg.body)));
+        }, err => { pollREST(); });
+      } catch(e) { pollREST(); }
     }
 
     function reconnect() {
-        fetch('/api/connect', { method: 'POST' })
-            .then(r => r.json())
-            .then(d => { alert(d.message); connect(); });
+      fetch('/api/connect', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { alert(d.message); connect(); })
+        .catch(() => alert('Reconnect failed'));
     }
 
-    function setStatus(ok) {
-        document.getElementById('status-dot').className = ok ? 'connected' : 'disconnected';
-        document.getElementById('status-text').textContent = ok ? 'Connected to JVM' : 'Disconnected';
+    function setStatus(cls, txt) {
+      document.getElementById('status-dot').className = 'status-dot ' + cls;
+      document.getElementById('status-text').textContent = txt;
     }
 
-    let selectedThreadId = null;
-    let historyLog = [];
-    let previousStates = {};
-    let previousLines = {};
-
+    // ══════════════════════ RENDER ══════════════════════
     function renderAll(threads) {
-        updateStats(threads);
-        renderProcessCircle(threads);
-        renderThreadList(threads);
-        detectStateChanges(threads);
-        if (selectedThreadId !== null) {
-            const sel = threads.find(t => t.id === selectedThreadId);
-            if (sel) renderDetailCard(sel);
-        }
+      updateStats(threads);
+      renderCanvas(threads);
+      renderThreadList(threads);
+      detectChanges(threads);
+      if (selectedId !== null) {
+        const sel = threads.find(t => t.id === selectedId);
+        if (sel) renderDetail(sel);
+      }
     }
 
     function updateStats(threads) {
-        document.getElementById('total-count').textContent = threads.length;
-        document.getElementById('run-count').textContent =
-            threads.filter(t => t.state === 'RUNNABLE').length;
-        document.getElementById('block-count').textContent =
-            threads.filter(t => t.state === 'BLOCKED').length;
-        document.getElementById('wait-count').textContent =
-            threads.filter(t => t.state === 'WAITING' || t.state === 'TIMED_WAITING').length;
+      document.getElementById('total-count').textContent = threads.length;
+      document.getElementById('run-count').textContent = threads.filter(t => t.state === 'RUNNABLE').length;
+      document.getElementById('block-count').textContent = threads.filter(t => t.state === 'BLOCKED').length;
+      document.getElementById('wait-count').textContent = threads.filter(t => t.state === 'WAITING' || t.state === 'TIMED_WAITING').length;
     }
 
-    function renderProcessCircle(threads) {
-        const container = document.getElementById('thread-nodes');
-        container.innerHTML = '';
-        if (!threads.length) return;
-        const circle = document.getElementById('process-circle');
-        const circleSize = circle.offsetWidth;
-        const center = circleSize / 2;
-        const nodeSize = 52;
-        const nodeRadius = nodeSize / 2;
-        const orbitRadius = center - nodeRadius - 20;
-        threads.forEach((thread, index) => {
-            const angle = (2 * Math.PI * index / threads.length) - (Math.PI / 2);
-            const x = center + orbitRadius * Math.cos(angle) - nodeRadius;
-            const y = center + orbitRadius * Math.sin(angle) - nodeRadius;
-            const node = document.createElement('div');
-            node.className = 'thread-node ' + thread.state;
-            node.id = 'node-' + thread.id;
-            if (thread.id === selectedThreadId) node.classList.add('selected');
-            node.style.left = x + 'px';
-            node.style.top  = y + 'px';
-            node.textContent = thread.name.length > 7
-                ? thread.name.substring(0, 6) + '..'
-                : thread.name;
-            node.title = thread.name + '\nState: ' + thread.state + '\nMethod: ' + thread.currentMethod;
-            node.addEventListener('click', () => {
-                selectedThreadId = thread.id;
-                renderDetailCard(thread);
-                document.querySelectorAll('.thread-node').forEach(n => n.classList.remove('selected'));
-                document.querySelectorAll('.thread-row').forEach(r => r.classList.remove('selected'));
-                node.classList.add('selected');
-                const row = document.getElementById('row-' + thread.id);
-                if (row) row.classList.add('selected');
-            });
-            container.appendChild(node);
+    function renderCanvas(threads) {
+      const wrap = document.getElementById('canvas-wrap');
+      const container = document.getElementById('thread-nodes-canvas');
+      const svgLines = document.getElementById('svg-lines');
+      container.innerHTML = '';
+      svgLines.innerHTML = '';
+
+      const W = wrap.clientWidth;
+      const H = wrap.clientHeight;
+      const cx = W / 2;
+      const cy = H / 2;
+
+      if (!threads.length) return;
+
+      // Use an ellipse orbit to fill the canvas space
+      const rx = Math.min(cx - 80, (W - 160) / 2);
+      const ry = Math.min(cy - 80, (H - 160) / 2);
+
+      threads.forEach((thread, i) => {
+        const angle = (2 * Math.PI * i / threads.length) - Math.PI / 2;
+        const x = cx + rx * Math.cos(angle);
+        const y = cy + ry * Math.sin(angle);
+
+        // SVG line from center
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+        line.setAttribute('x2', x); line.setAttribute('y2', y);
+        line.setAttribute('class', 'thread-line');
+        svgLines.appendChild(line);
+
+        // Node
+        const node = document.createElement('div');
+        node.className = 't-node ' + thread.state;
+        node.id = 'cnode-' + thread.id;
+        if (thread.id === selectedId) node.classList.add('selected');
+        node.style.left = x + 'px';
+        node.style.top  = y + 'px';
+
+        const stateIcons = { RUNNABLE:'▶', BLOCKED:'⛔', WAITING:'⏳', TIMED_WAITING:'⏱', TERMINATED:'✓', NEW:'✦' };
+        const shortName = thread.name.length > 9 ? thread.name.substring(0,8) + '…' : thread.name;
+
+        node.innerHTML = `
+          <div class="t-ring"></div>
+          <div class="t-circle">
+            <div class="t-icon">${stateIcons[thread.state] || '●'}</div>
+            <div class="t-label">${shortName}</div>
+          </div>`;
+
+        node.title = `${thread.name}\nState: ${thread.state}\nMethod: ${thread.currentMethod}`;
+
+        node.addEventListener('click', () => {
+          selectedId = thread.id;
+          renderDetail(thread);
+          document.querySelectorAll('.t-node').forEach(n => n.classList.remove('selected'));
+          document.querySelectorAll('.t-row').forEach(r => r.classList.remove('selected'));
+          node.classList.add('selected');
+          const row = document.getElementById('trow-' + thread.id);
+          if (row) row.classList.add('selected');
         });
+
+        container.appendChild(node);
+      });
     }
 
     function renderThreadList(threads) {
-        const list = document.getElementById('thread-list');
-        list.innerHTML = '';
-        threads.forEach(thread => {
-            const row = document.createElement('div');
-            row.className = 'thread-row' + (thread.id === selectedThreadId ? ' selected' : '');
-            row.id = 'row-' + thread.id;
-            row.innerHTML = `
-                <span class="badge ${thread.state}">${thread.state.replace('_', ' ')}</span>
-                <span class="tname">${thread.name}</span>
-                <span class="tmethod">${thread.currentMethod}</span>`;
-            row.addEventListener('click', () => {
-                selectedThreadId = thread.id;
-                renderDetailCard(thread);
-                document.querySelectorAll('.thread-row').forEach(r => r.classList.remove('selected'));
-                document.querySelectorAll('.thread-node').forEach(n => n.classList.remove('selected'));
-                row.classList.add('selected');
-                const node = document.getElementById('node-' + thread.id);
-                if (node) node.classList.add('selected');
-            });
-            list.appendChild(row);
+      const list = document.getElementById('thread-list');
+      list.innerHTML = '';
+      threads.forEach(thread => {
+        const row = document.createElement('div');
+        row.className = 't-row' + (thread.id === selectedId ? ' selected' : '');
+        row.id = 'trow-' + thread.id;
+        row.innerHTML = `
+          <span class="badge ${thread.state}">${thread.state.replace('_',' ')}</span>
+          <span class="t-row-name">${thread.name}</span>
+          <span class="t-row-method">${thread.currentMethod}</span>`;
+        row.addEventListener('click', () => {
+          selectedId = thread.id;
+          renderDetail(thread);
+          document.querySelectorAll('.t-row').forEach(r => r.classList.remove('selected'));
+          document.querySelectorAll('.t-node').forEach(n => n.classList.remove('selected'));
+          row.classList.add('selected');
+          const node = document.getElementById('cnode-' + thread.id);
+          if (node) node.classList.add('selected');
         });
+        list.appendChild(row);
+      });
     }
 
-    function renderDetailCard(t) {
-        document.getElementById('detail-header').textContent = 'Thread details';
-        document.getElementById('detail-body').innerHTML = `
-            <div class="detail-name">
-                ${t.name}
-                <span class="badge ${t.state}" style="margin-left:6px">${t.state.replace('_', ' ')}</span>
-            </div>
-            <div class="detail-row"><span class="label">Thread ID</span><span class="value">${t.id}</span></div>
-            <div class="detail-row"><span class="label">Group</span><span class="value">${t.threadGroup}</span></div>
-            <div class="detail-row"><span class="label">Method</span><span class="value" title="${t.currentMethod}">${t.currentMethod}</span></div>
-            <div class="detail-row"><span class="label">Source file</span><span class="value">${t.sourceFile}</span></div>
-            <div class="detail-row"><span class="label">Line number</span><span class="value">${t.lineNumber > 0 ? t.lineNumber : '-'}</span></div>`;
+    function renderDetail(t) {
+      document.getElementById('detail-empty').style.display = 'none';
+      const content = document.getElementById('detail-content');
+      content.style.display = 'block';
+      content.innerHTML = `
+        <div class="d-name">
+          <span>${t.name}</span>
+          <span class="badge ${t.state}">${t.state.replace('_',' ')}</span>
+        </div>
+        <div class="d-row"><span class="d-key">Thread ID</span><span class="d-val">${t.id}</span></div>
+        <div class="d-row"><span class="d-key">Group</span><span class="d-val">${t.threadGroup || '—'}</span></div>
+        <div class="d-row"><span class="d-key">Method</span><span class="d-val" title="${t.currentMethod}">${t.currentMethod}</span></div>
+        <div class="d-row"><span class="d-key">Source</span><span class="d-val">${t.sourceFile || '—'}</span></div>
+        <div class="d-row"><span class="d-key">Line</span><span class="d-val">${t.lineNumber > 0 ? t.lineNumber : '—'}</span></div>`;
     }
 
-    function detectStateChanges(threads) {
-        const now = new Date().toLocaleTimeString();
-        threads.forEach(t => {
-            const isNew = previousStates[t.id] === undefined;
-            const stateChanged = !isNew && previousStates[t.id] !== t.state;
-            const lineChanged = previousLines[t.id] !== undefined
-                                && previousLines[t.id] !== t.lineNumber
-                                && t.lineNumber > 0;
-            if (isNew || stateChanged || lineChanged) {
-                historyLog.unshift({
-                    time:      now,
-                    name:      t.name,
-                    state:     t.state,
-                    method:    t.currentMethod,
-                    file:      t.sourceFile,
-                    line:      t.lineNumber,
-                    variables: t.variables || []
-                });
-            }
-            previousStates[t.id] = t.state;
-            previousLines[t.id]  = t.lineNumber;
-            if (historyLog.length > 500) historyLog.pop();
-        });
-        renderHistory();
+    // ══════════════════════ HISTORY ══════════════════════
+    function detectChanges(threads) {
+      const now = new Date().toLocaleTimeString();
+      threads.forEach(t => {
+        const isNew = prevStates[t.id] === undefined;
+        const stateChanged = !isNew && prevStates[t.id] !== t.state;
+        const lineChanged = prevLines[t.id] !== undefined && prevLines[t.id] !== t.lineNumber && t.lineNumber > 0;
+        if (isNew || stateChanged || lineChanged) {
+          historyLog.unshift({ time: now, name: t.name, state: t.state, method: t.currentMethod, file: t.sourceFile, line: t.lineNumber, variables: t.variables || [] });
+        }
+        prevStates[t.id] = t.state;
+        prevLines[t.id]  = t.lineNumber;
+        if (historyLog.length > 500) historyLog.pop();
+      });
+      renderHistory();
     }
 
     function renderHistory() {
-        document.getElementById('history-list').innerHTML =
-            historyLog.slice(0, 100).map(e => {
-                const lineInfo = e.line > 0
-                    ? `<span class="h-line">line ${e.line}</span>` : '';
-
-                // Full method & file — no truncation, entry scrolls horizontally
-                const methodRow = e.method && e.method !== 'unknown'
-                    ? `<div class="h-method-row">
-                           <span class="h-method-label">at</span>
-                           <span class="h-method">${e.method}</span>
-                           ${e.file && e.file !== '-' ? `<span class="h-file">${e.file}</span>` : ''}
-                       </div>`
-                    : '';
-
-                // Full variable values — no truncation
-                const vars = e.variables && e.variables.length > 0
-                    ? `<div class="h-vars-row">${
-                        e.variables.map(v =>
-                            `<span class="h-var">
-                                <span class="h-var-name">${v.name}</span>
-                                <span class="h-var-eq">=</span>
-                                <span class="h-var-val">${v.value}</span>
-                                <span class="h-var-type">(${v.type})</span>
-                             </span>`
-                        ).join('')
-                    }</div>`
-                    : '';
-
-                // h-entry-inner uses min-width:max-content → triggers horizontal scroll on .history-entry
-                return `<div class="history-entry">
-                    <div class="h-entry-inner">
-                        <div class="h-main-row">
-                            <span class="h-time">${e.time}</span>
-                            <span class="h-name">${e.name}</span>
-                            <span class="h-arrow">→</span>
-                            <span class="h-state ${e.state}">${e.state.replace('_', ' ')}</span>
-                            ${lineInfo}
-                        </div>
-                        ${methodRow}${vars}
-                    </div>
-                </div>`;
-            }).join('');
+      document.getElementById('history-list').innerHTML = historyLog.slice(0, 100).map(e => {
+        const lineInfo = e.line > 0 ? `<span class="h-line"> · line ${e.line}</span>` : '';
+        const methodRow = e.method && e.method !== 'unknown'
+          ? `<div class="h-method"><span class="at">at</span><span class="fn">${e.method}</span>${e.file && e.file !== '-' ? `<span class="fi">${e.file}</span>` : ''}</div>`
+          : '';
+        const vars = e.variables && e.variables.length
+          ? `<div class="h-vars">${e.variables.map(v => `<span class="h-var"><span class="h-vn">${v.name}</span><span class="h-ve">=</span><span class="h-vv">${v.value}</span><span class="h-vt">(${v.type})</span></span>`).join('')}</div>`
+          : '';
+        return `<div class="h-entry"><div class="h-inner">
+          <div class="h-main">
+            <span class="h-time">${e.time}</span>
+            <span class="h-tname">${e.name}</span>
+            <span class="h-arrow">→</span>
+            <span class="h-state ${e.state}">${e.state.replace('_',' ')}</span>
+            ${lineInfo}
+          </div>
+          ${methodRow}${vars}
+        </div></div>`;
+      }).join('');
     }
 
     function clearHistory() {
-        historyLog = [];
-        previousStates = {};
-        renderHistory();
+      historyLog = []; prevStates = {};
+      renderHistory();
     }
 
+    // ══════════════════════ CONTROLS ══════════════════════
     function stepJVM() {
-        fetch('/api/step', { method: 'POST' })
-            .then(r => r.json())
-            .then(d => console.log('Stepped:', d));
+      fetch('/api/step', { method: 'POST' }).then(r => r.json()).catch(() => {});
     }
 
     function suspendJVM() {
-        fetch('/api/suspend', { method: 'POST' })
-            .then(r => r.json())
-            .then(d => {
-                document.getElementById('status-text').textContent = '⏸ JVM Paused';
-                document.getElementById('status-dot').style.background = '#EF9F27';
-            });
+      fetch('/api/suspend', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => setStatus('paused', '⏸ JVM Paused'))
+        .catch(() => {});
     }
 
     function resumeJVM() {
-        fetch('/api/resume', { method: 'POST' })
-            .then(r => r.json())
-            .then(d => {
-                document.getElementById('status-text').textContent = 'Connected to JVM';
-                document.getElementById('status-dot').style.background = '#1D9E75';
-                fetch('/api/threads')
-                    .then(r => r.json())
-                    .then(threads => {
-                        renderAll(threads);
-                        const now = new Date().toLocaleTimeString();
-                        threads.forEach(t => {
-                            historyLog.unshift({
-                                time: now, name: t.name, state: t.state,
-                                method: t.currentMethod, file: t.sourceFile,
-                                line: t.lineNumber, variables: t.variables || []
-                            });
-                            previousStates[t.id] = t.state;
-                            previousLines[t.id] = t.lineNumber;
-                        });
-                        renderHistory();
-                    });
+      fetch('/api/resume', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+          setStatus('connected', 'Connected to JVM');
+          fetch('/api/threads').then(r => r.json()).then(threads => {
+            renderAll(threads);
+            const now = new Date().toLocaleTimeString();
+            threads.forEach(t => {
+              historyLog.unshift({ time: now, name: t.name, state: t.state, method: t.currentMethod, file: t.sourceFile, line: t.lineNumber, variables: t.variables || [] });
+              prevStates[t.id] = t.state; prevLines[t.id] = t.lineNumber;
             });
+            renderHistory();
+          });
+        }).catch(() => {});
     }
 
     function updateSpeed(value) {
-        document.getElementById('speed-label').textContent =
-            value == 0 ? 'Max' : value + 'ms';
-        fetch('/api/speed?delayMs=' + value, { method: 'POST' })
-            .catch(e => console.error('Speed update failed:', e));
+      document.getElementById('speed-label').textContent = value == 0 ? 'Max' : value + 'ms';
+      fetch('/api/speed?delayMs=' + value, { method: 'POST' }).catch(() => {});
     }
 
-    function togglePanel(titleEl) {
-        const body = titleEl.nextElementSibling;
-        const isCollapsed = body.classList.toggle('collapsed');
-        titleEl.classList.toggle('collapsed', isCollapsed);
+    function toggleSec(head) {
+      const body = head.nextElementSibling;
+      const collapsed = body.classList.toggle('collapsed');
+      head.classList.toggle('collapsed', collapsed);
     }
 
+    // Rerender canvas on resize
+    window.addEventListener('resize', () => {
+      if (window._lastThreads) renderCanvas(window._lastThreads);
+    });
+
+    const _origRenderAll = renderAll;
+    window.renderAll = (threads) => { window._lastThreads = threads; _origRenderAll(threads); };
+
+    // ══════════════════════ SIDEBAR RESIZER ══════════════════════
     (function() {
-        const resizer = document.getElementById('sidebar-resizer');
-        const sidebar = document.getElementById('sidebar');
-        let startX, startWidth;
-        resizer.addEventListener('mousedown', e => {
-            startX     = e.clientX;
-            startWidth = sidebar.offsetWidth;
-            resizer.classList.add('dragging');
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
-            function onMove(e) {
-                const delta = startX - e.clientX;
-                const newWidth = Math.min(600, Math.max(220, startWidth + delta));
-                sidebar.style.width = newWidth + 'px';
-            }
-            function onUp() {
-                resizer.classList.remove('dragging');
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-            }
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
-        });
+      const resizer = document.getElementById('sidebar-resizer');
+      const sidebar = document.getElementById('sidebar');
+      let startX, startW;
+
+      resizer.addEventListener('mousedown', e => {
+        startX = e.clientX;
+        startW = sidebar.offsetWidth;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        function onMove(e) {
+          const delta = startX - e.clientX;
+          const newW = Math.min(640, Math.max(220, startW + delta));
+          sidebar.style.width = newW + 'px';
+        }
+        function onUp() {
+          resizer.classList.remove('dragging');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          if (window._lastThreads) renderCanvas(window._lastThreads);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
     })();
 
     connect();
